@@ -142,8 +142,8 @@
         </div>
         <div class="currency-bar">
             <span>Валюта: <strong id="currentBaseCurrency" class="badge">UAH</strong></span>
-            <span>USD: <strong id="dispUsdRate">41.50</strong> грн</span>
-            <span>EUR: <strong id="dispEurRate">45.20</strong> грн</span>
+            <span>USD: <strong id="dispUsdRate">45.00</strong> грн</span>
+            <span>EUR: <strong id="dispEurRate">53.00</strong> грн</span>
             <button class="btn btn-outline" onclick="openAdminModal()">⚙️ Админка / Тарифы</button>
         </div>
     </header>
@@ -159,12 +159,12 @@
             <span class="save-indicator" id="saveIndicator">💾 сохранено</span>
             
             <!-- Кнопки управления проектами (черновиками заказов) -->
-            <button class="btn btn-outline" onclick="document.getElementById('importProjectFile').click()" title="Загрузить заказ из таблицы Excel">📂 Импорт заказа</button>
-            <button class="btn btn-outline" onclick="exportProjectExcel()" title="Сохранить заказ как редактируемую таблицу Excel">💾 Экспорт заказа</button>
+            <button class="btn btn-outline" onclick="document.getElementById('importProjectFile').click()" title="Загрузить отложенный проект заказа (.json)">📂 Открыть проект</button>
+            <button class="btn btn-outline" onclick="exportProject()" title="Сохранить текущий расчет как файл-проект на компьютер">💾 Сохранить проект</button>
             <button class="btn btn-outline" onclick="openGoogleDriveModal()" title="Настроить синхронизацию с Google Drive">☁️ Drive</button>
             <button class="btn btn-outline" onclick="saveProjectToDrive()" title="Сохранить весь проект в Google Drive">☁️ Сохранить в Drive</button>
             <button class="btn btn-outline" onclick="loadProjectFromDrive()" title="Открыть проект из Google Drive по ссылке или ID">☁️ Открыть из Drive</button>
-            <input type="file" id="importProjectFile" style="display:none" accept=".xlsx,.xls,.json" onchange="importProjectFileHandler(event)">
+            <input type="file" id="importProjectFile" style="display:none" accept=".json" onchange="importProject(event)">
             
             <!-- Кнопки экспорта сметы -->
             <button class="btn btn-outline" style="border-color: var(--success); color: var(--success);" onclick="printClientEstimate()">🖨️ PDF для клиента</button>
@@ -214,9 +214,9 @@
             <div class="form-group"><label>Тариф электроэнергии (грн/кВт·ч):</label>
                 <input type="number" id="cfgElecTariff" class="form-control" value="25.00" onchange="updateAdminConfig()"></div>
             <div class="form-group"><label>Курс USD / UAH:</label>
-                <input type="number" step="0.01" id="cfgUsdRate" class="form-control" value="41.50" onchange="updateAdminConfig()"></div>
+                <input type="number" step="0.01" id="cfgUsdRate" class="form-control" value="45.00" onchange="updateAdminConfig()"></div>
             <div class="form-group"><label>Курс EUR / UAH:</label>
-                <input type="number" step="0.01" id="cfgEurRate" class="form-control" value="45.20" onchange="updateAdminConfig()"></div>
+                <input type="number" step="0.01" id="cfgEurRate" class="form-control" value="53.00" onchange="updateAdminConfig()"></div>
             <div class="form-group"><label>Чернила Mimaki LUS-210 (1 л, грн):</label>
                 <input type="number" id="cfgInkPrice" class="form-control" value="4626.00" onchange="updateAdminConfig()"></div>
             <div class="form-group"><label>Праймирование PR-200 (грн/м²):</label>
@@ -288,7 +288,7 @@
             <h2>Google Drive: общий прайс и проекты</h2>
             <button class="btn btn-outline" onclick="closeGoogleDriveModal()">✕</button>
         </div>
-        <p class="warning-box">Общий прайс хранится в одном служебном файле на Google Drive. Владелец файла должен дать коллегам доступ <strong>«Редактор»</strong>. Проекты в Drive сохраняются в служебном формате, а для обмена с пользователями используется Excel.</p>
+        <p class="warning-box">Общий прайс хранится в одном JSON-файле на Google Drive. Владелец файла должен дать коллегам доступ <strong>«Редактор»</strong>. Данные проекта хранятся отдельными файлами.</p>
         <div class="form-group" style="margin-bottom: 15px;">
             <label>OAuth Client ID из Google Cloud:</label>
             <input type="text" id="cfgGoogleClientId" class="form-control" placeholder="123…apps.googleusercontent.com">
@@ -309,7 +309,7 @@
 /**
  * БАЗА ДАННЫХ И КОНФИГУРАЦИЯ (v12 - Контроль сохранения проектов)
  */
-const STORAGE_KEY = 'mimaki-app-state-v13';
+const STORAGE_KEY = 'mimaki-app-state-v12';
 const GOOGLE_DRIVE_SETTINGS_KEY = 'mimaki-google-drive-settings-v1';
 // Полный scope нужен только потому, что общий файл создаётся одним аккаунтом и
 // редактируется другими по прямой ссылке. Приложение обращается только к ID,
@@ -576,6 +576,8 @@ function applyPriceSnapshot(snapshot) {
             ...(savedConfig.limits || {})
         }
     };
+    if (Number(savedConfig.exchangeRates?.USD) === 41.5) appData.config.exchangeRates.USD = 45.0;
+    if (Number(savedConfig.exchangeRates?.EUR) === 45.2) appData.config.exchangeRates.EUR = 53.0;
     if (!['UAH', 'USD', 'EUR'].includes(appData.config.baseCurrency)) appData.config.baseCurrency = 'UAH';
     appData.materials = snapshot.materials;
     document.getElementById('currentBaseCurrency').innerText = appData.config.baseCurrency;
@@ -758,7 +760,7 @@ const defaultAppData = {
     isSavedToFile: true, // Флаг: сохранен ли текущий проект в .json файл
     config: {
         baseCurrency: 'UAH',
-        exchangeRates: { UAH: 1.0, USD: 41.50, EUR: 45.20 },
+        exchangeRates: { UAH: 1.0, USD: 45.00, EUR: 53.00 },
         elecTariffKwh: 25.00, powerPrinterKw: 0.80, powerClimateWorkKw: 1.00,
         inkPriceBottleUah: 4626.00, primerCostM2Uah: 15.00,
         operatorSalaryHourUah: 200.00, rentMonthUah: 6000.00, monthlyWorkHours: 160,
@@ -769,23 +771,11 @@ const defaultAppData = {
         limits: { maxWidthM: 1.61, maxThicknessMm: 50.8 }
     },
     materials: [
-        { id: 'mat_film_gloss', name: 'білий/прозорий плівка с/к Oracal 640 1,26x50 (глянець/мат ) рулони 1; 1,26;  1,4', type: 'roll', price: 1.54, currency: 'EUR', scrapRate: 0.05, baseMarkup: 35, extraMarkup: 0, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_film_gloss_02', name: 'Лист білий/прозорий плівка с/к Oracal 640 0,7х1,0 глянець', type: 'sheet', price: 1.54, currency: 'EUR', scrapRate: 0.05, baseMarkup: 35, extraMarkup: 0, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_film_gloss_03', name: 'білий/прозорий плівка с/к Oracal 641 1x50 (глянець/мат , )', type: 'roll', price: 2.47, currency: 'EUR', scrapRate: 0.05, baseMarkup: 35, extraMarkup: 0, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_film_color_641', name: 'Кольорова плівка с/к Oracal 641 1x50 глянець/мат ', type: 'roll', price: 3.52, currency: 'EUR', scrapRate: 0.05, baseMarkup: 35, extraMarkup: 0, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_film_metal_641', name: 'срібло, золото , мідь плівка с/к Oracal 641 1x50 (глянець/мат)\nлівка с/к Oracal 641 1x50 (глянець/мат, )', type: 'roll', price: 3.77, currency: 'EUR', scrapRate: 0.05, baseMarkup: 35, extraMarkup: 0, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_film_chrome_352', name: 'Зеркальна хром плівка с/к Oracal 352 1x50 ', type: 'roll', price: 4.34, currency: 'EUR', scrapRate: 0.05, baseMarkup: 35, extraMarkup: 0, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_film_gold_352', name: 'Зеркальна золото плівка с/к Oracal 352 1x50 ', type: 'roll', price: 5.17, currency: 'EUR', scrapRate: 0.05, baseMarkup: 35, extraMarkup: 0, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_film_hologram', name: 'Голограма плівка с/к веселка (0,61м, срібло К-47)', type: 'roll', price: 2.36, currency: 'EUR', scrapRate: 0.06, baseMarkup: 35, extraMarkup: 0, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_film_selfdestruct_820', name: 'Саморуйна плівка с/к Oracal 820 1x50 (мат/глянець,   білий)', type: 'roll', price: 13.05, currency: 'EUR', scrapRate: 0.07, baseMarkup: 35, extraMarkup: 0, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_banner_440', name: 'Банерне полотно Frontlit premium 440, 450gsm  (литий, мат) рулони 1,10; 1,37; 1,60;', type: 'roll', price: 1.16, currency: 'EUR', scrapRate: 0.04, baseMarkup: 40, extraMarkup: 10, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_pvc_3mm', name: 'ПВХ спінений 3 мм 3050х2050 ', type: 'sheet', price: 7.72, currency: 'EUR', scrapRate: 0.10, baseMarkup: 100, extraMarkup: 5, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_pvc_5mm', name: 'ПВХ спінений 5мм 3050х2050 ', type: 'sheet', price: 12.90, currency: 'EUR', scrapRate: 0.10, baseMarkup: 100, extraMarkup: 5, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_pvc_clear_05', name: 'ПВХ  прозорий, гл/ембос 0,5х1400х1000 мм', type: 'sheet', price: 5.25, currency: 'EUR', scrapRate: 0.10, baseMarkup: 100, extraMarkup: 5, defaultPrimer: true, recommendedMode: 'MODE_W_CMYK_2PASS' },
-        { id: 'mat_pvc_white_05', name: 'ПВХ  білий, мат 0,5х1400х1000 мм', type: 'sheet', price: 5.52, currency: 'EUR', scrapRate: 0.10, baseMarkup: 100, extraMarkup: 5, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_pet_clear_05', name: 'ПЕТ 0,5х2050х1250 мм прозорий', type: 'sheet', price: 4.10, currency: 'EUR', scrapRate: 0.10, baseMarkup: 100, extraMarkup: 5, defaultPrimer: true, recommendedMode: 'MODE_W_CMYK_2PASS' },
-        { id: 'mat_acrylic_4mm', name: 'Акрил прозрачный 3 мм', type: 'sheet', price: 25.00, currency: 'EUR', scrapRate: 0.10, baseMarkup: 100, extraMarkup: 15, defaultPrimer: true, recommendedMode: 'MODE_W_CMYK_2PASS' },
-        { id: 'mat_acrylic_braille', name: 'Брайль желтий ПВХ спінений  3 мм 1,53x3,05 м', type: 'sheet', price: 13.80, currency: 'EUR', scrapRate: 0.15, baseMarkup: 100, extraMarkup: 100, defaultPrimer: true, recommendedMode: 'MODE_BRAILLE' },
+        { id: 'mat_film_gloss', name: 'Пленка Ritrama Gloss', type: 'roll', price: 45.00, currency: 'UAH', scrapRate: 0.05, baseMarkup: 50, extraMarkup: 0, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
+        { id: 'mat_banner_440', name: 'Баннер Frontlit 440g', type: 'roll', price: 1.85, currency: 'USD', scrapRate: 0.04, baseMarkup: 40, extraMarkup: 10, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
+        { id: 'mat_pvc_3mm', name: 'ПВХ пластик 3 мм', type: 'sheet', price: 6.20, currency: 'EUR', scrapRate: 0.06, baseMarkup: 35, extraMarkup: 5, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
+        { id: 'mat_acrylic_4mm', name: 'Акрил прозрачный 4 мм', type: 'sheet', price: 22.50, currency: 'EUR', scrapRate: 0.10, baseMarkup: 40, extraMarkup: 15, defaultPrimer: true, recommendedMode: 'MODE_W_CMYK_2PASS' },
+        { id: 'mat_acrylic_braille', name: 'Акрил под Брайль 4 мм', type: 'sheet', price: 22.50, currency: 'EUR', scrapRate: 0.15, baseMarkup: 40, extraMarkup: 15, defaultPrimer: true, recommendedMode: 'MODE_BRAILLE' },
         { id: 'mat_client', name: 'Давальческое сырье клиента', type: 'sheet', price: 0.00, currency: 'UAH', scrapRate: 0.15, baseMarkup: 0, extraMarkup: 0, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' }
     ],
     positions: []
@@ -848,7 +838,14 @@ function loadAppData() {
             const p = JSON.parse(result);
             if (p.orderName !== undefined) appData.orderName = p.orderName;
             if (p.isSavedToFile !== undefined) appData.isSavedToFile = p.isSavedToFile;
-            if (p.config) Object.assign(appData.config, p.config);
+            if (p.config) {
+                Object.assign(appData.config, p.config);
+                if (p.config.exchangeRates) {
+                    appData.config.exchangeRates = { ...defaultAppData.config.exchangeRates, ...p.config.exchangeRates };
+                    if (Number(p.config.exchangeRates.USD) === 41.5) appData.config.exchangeRates.USD = 45.0;
+                    if (Number(p.config.exchangeRates.EUR) === 45.2) appData.config.exchangeRates.EUR = 53.0;
+                }
+            }
             if (p.materials && p.materials.length) appData.materials = p.materials;
             if (p.positions) appData.positions = normalizePositions(p.positions);
         }
@@ -994,160 +991,49 @@ function startNewOrder() {
     }
 }
 
-function exportProjectExcel() {
-    if (typeof XLSX === 'undefined') { alert('Библиотека Excel недоступна. Проверьте интернет.'); return; }
-    const positions = appData.positions.map((pos, index) => {
-        const calc = calculatePositionValues(pos);
-        return {
-            '№': index + 1,
-            'ID позиции': pos.id,
-            'Материал ID': pos.materialId,
-            'Материал': calc.mat.name,
-            'Тип': pos.effType,
-            'Ширина материала, м': pos.matWidthM,
-            'Длина материала, м': pos.matHeightM,
-            'Ширина печати, м': pos.printWidthM,
-            'Длина печати, м': pos.printHeightM,
-            'Тираж, шт': pos.quantity,
-            'Режим печати': pos.modeCode,
-            'Праймер': pos.usePrimer ? 'Да' : 'Нет',
-            'Брак, %': Number((pos.customScrapRate * 100).toFixed(2)),
-            'Уровень цен': pos.priceTier,
-            'Время вручную, ч': pos.manualTimeH === null ? '' : pos.manualTimeH,
-            'Приладка вручную, грн': pos.manualSetupFee === null ? '' : pos.manualSetupFee,
-            'Мелкий/средний формат': pos.isMediumFormat ? 'Да' : 'Нет',
-            'Свой материал без запаса': pos.hasNoStock ? 'Да' : 'Нет',
-            'Срочность': pos.urgency,
-            'Площадь печати, м²': Number(calc.printAreaM2.toFixed(2)),
-            'Цена за 1 шт': Number(calc.unitPrice.toFixed(2)),
-            'Сумма позиции': Number(calc.posGrandTotal.toFixed(2))
-        };
-    });
-    if (!positions.length) { alert('Нет позиций для экспорта.'); return; }
-    const orderRows = [
-        ['Параметр', 'Значение'],
-        ['Название заказа', appData.orderName || ''],
-        ['Дата экспорта', new Date().toLocaleString('ru-RU')],
-        ['Валюта', appData.config.baseCurrency]
-    ];
-    const wsOrder = XLSX.utils.aoa_to_sheet(orderRows);
-    const wsPositions = XLSX.utils.json_to_sheet(positions);
-    wsOrder['!cols'] = [{wch:28},{wch:45}];
-    wsPositions['!cols'] = Object.keys(positions[0]).map(() => ({wch:20}));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, wsOrder, 'Заказ');
-    XLSX.utils.book_append_sheet(wb, wsPositions, 'Позиции');
-    XLSX.writeFile(wb, `Mimaki_Заказ_${getOrderFileNamePrefix()}_${Date.now()}.xlsx`);
-    appData.isSavedToFile = true;
+function exportProject() {
+    const projectData = {
+        orderName: appData.orderName,
+        positions: appData.positions
+    };
+    const dataStr = JSON.stringify(projectData, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const fileName = getOrderFileNamePrefix();
+    a.download = `Mimaki_Project_${fileName}_${Date.now()}.json`;
+    a.click();
+
+    appData.isSavedToFile = true; // Снимаем флаг несохраненности
     saveAppData();
 }
 
-function parseYesNo(value, fallback = false) {
-    if (value === undefined || value === null || value === '') return fallback;
-    return ['true','да','yes','1','так'].includes(String(value).trim().toLowerCase());
-}
-
-function findMaterialForImportedRow(row) {
-    const id = getExcelValue(row, 'Материал ID', 'ID материала', 'ID');
-    if (id) {
-        const byId = appData.materials.find(m => m.id === String(id));
-        if (byId) return byId;
-    }
-    const name = String(getExcelValue(row, 'Материал') || '').trim();
-    if (name) {
-        const byName = appData.materials.find(m => m.name.trim() === name);
-        if (byName) return byName;
-    }
-    return appData.materials[0] || defaultAppData.materials[0];
-}
-
-function importProjectExcel(workbook) {
-    const positionsSheet = workbook.Sheets['Позиции'] || workbook.Sheets['Заказ'];
-    if (!positionsSheet) throw new Error('Не найден лист «Позиции».');
-    const rows = XLSX.utils.sheet_to_json(positionsSheet, { defval: '' });
-    if (!rows.length) throw new Error('В таблице нет позиций.');
-    const orderSheet = workbook.Sheets['Заказ'];
-    const orderRows = orderSheet ? XLSX.utils.sheet_to_json(orderSheet, { header: 1, defval: '' }) : [];
-    let orderName = '';
-    if (orderRows.length) {
-        const nameRow = orderRows.find(r => String(r[0] || '').trim() === 'Название заказа');
-        if (nameRow) orderName = String(nameRow[1] || '').trim();
-    }
-    const imported = rows.map((row, index) => {
-        const mat = findMaterialForImportedRow(row);
-        const width = validNumber(getExcelValue(row, 'Ширина материала, м', 'Ширина мат-ла, м'), 1, 0.001);
-        const height = validNumber(getExcelValue(row, 'Длина материала, м', 'Длина мат-ла, м'), 1, 0.001);
-        const printWidth = validNumber(getExcelValue(row, 'Ширина печати, м'), width, 0.001);
-        const printHeight = validNumber(getExcelValue(row, 'Длина печати, м'), height, 0.001);
-        const scrapRaw = getExcelValue(row, 'Брак, %');
-        const sourceId = getExcelValue(row, 'ID позиции');
-        const idNum = Number(sourceId);
-        return normalizePosition({
-            id: Number.isSafeInteger(idNum) && idNum > 0 ? idNum : Date.now() + index,
-            materialId: mat.id,
-            effType: String(getExcelValue(row, 'Тип') || mat.type).toLowerCase() === 'roll' ? 'roll' : 'sheet',
-            matWidthM: width,
-            matHeightM: height,
-            printWidthM: Math.min(printWidth, width),
-            printHeightM: Math.min(printHeight, height),
-            quantity: Math.max(1, Math.floor(validNumber(getExcelValue(row, 'Тираж, шт'), 1, 1))),
-            modeCode: String(getExcelValue(row, 'Режим печати') || mat.recommendedMode),
-            usePrimer: parseYesNo(getExcelValue(row, 'Праймер'), mat.defaultPrimer),
-            customScrapRate: scrapRaw === '' || scrapRaw === undefined ? mat.scrapRate : validNumber(scrapRaw, mat.scrapRate * 100, 0) / 100,
-            priceTier: ['retail','wholesale','dealer'].includes(String(getExcelValue(row, 'Уровень цен') || 'retail')) ? String(getExcelValue(row, 'Уровень цен') || 'retail') : 'retail',
-            manualTimeH: getExcelValue(row, 'Время вручную, ч') === '' ? null : validNumber(getExcelValue(row, 'Время вручную, ч'), null, 0),
-            manualSetupFee: getExcelValue(row, 'Приладка вручную, грн') === '' ? null : validNumber(getExcelValue(row, 'Приладка вручную, грн'), null, 0),
-            isMediumFormat: parseYesNo(getExcelValue(row, 'Мелкий/средний формат')),
-            hasNoStock: parseYesNo(getExcelValue(row, 'Свой материал без запаса')),
-            urgency: ['standard','24h','same_day'].includes(String(getExcelValue(row, 'Срочность') || 'standard')) ? String(getExcelValue(row, 'Срочность') || 'standard') : 'standard'
-        }, index);
-    });
-    appData.positions = imported;
-    if (orderName) appData.orderName = orderName;
-    document.getElementById('orderClientName').value = appData.orderName || '';
-    appData.isSavedToFile = true;
-    renderPositions();
-    saveAppData();
-}
-
-function importProjectFileHandler(event) {
+function importProject(event) {
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = function(e) {
         try {
-            if (/\.json$/i.test(file.name)) {
-                const importedData = JSON.parse(e.target.result);
-                if (!importedData.positions || !Array.isArray(importedData.positions)) throw new Error('Неверный формат проекта.');
+            const importedData = JSON.parse(e.target.result);
+            if (importedData.positions && Array.isArray(importedData.positions)) {
                 appData.positions = normalizePositions(importedData.positions);
                 appData.orderName = importedData.orderName || '';
                 document.getElementById('orderClientName').value = appData.orderName;
+                
+                appData.isSavedToFile = true; // Свежезагруженный проект считается сохраненным
+                renderPositions();
+                saveAppData();
+                alert('Проект заказа успешно загружен!');
             } else {
-                if (typeof XLSX === 'undefined') throw new Error('Библиотека Excel недоступна.');
-                const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-                importProjectExcel(workbook);
-                alert('Заказ из Excel успешно загружен. Пустые поля заполнены данными прайса/настройками калькулятора.');
-                event.target.value = '';
-                return;
+                alert('Неверный формат файла проекта.');
             }
-            appData.isSavedToFile = true;
-            renderPositions();
-            saveAppData();
-            alert('Проект заказа успешно загружен!');
         } catch (err) {
-            alert(`Не удалось импортировать заказ: ${err.message}`);
+            alert('Ошибка чтения файла проекта. Проверьте файл.');
         }
-        event.target.value = '';
+        event.target.value = ""; 
     };
-    if (/\.json$/i.test(file.name)) reader.readAsText(file); else reader.readAsArrayBuffer(file);
-}
-
-// Совместимость со старыми JSON-проектами.
-function exportProject() {
-    exportProjectExcel();
-}
-function importProject(event) {
-    importProjectFileHandler(event);
+    reader.readAsText(file);
 }
 
 // ------------------------------------------------------------------
@@ -1523,8 +1409,7 @@ function exportMaterialsExcel() {
         ['1. Откройте лист «Материалы»: можно изменить цены и добавить новые строки.'],
         ['2. Откройте лист «Настройки»: меняйте только колонку «Значение».'],
         ['3. Не меняйте названия листов, заголовки и столбцы «ID» / «Код параметра».'],
-        ['4. Сохраните файл .xlsx и загрузите его в калькулятор кнопкой «Импорт прайса».'],
-        ['5. Заказы обмениваются через кнопки «Импорт заказа» / «Экспорт заказа» — обычная таблица Excel, без JSON.']
+        ['4. Сохраните файл .xlsx и загрузите его в калькулятор кнопкой «Импорт прайса».']
     ];
 
     const wsMaterials = XLSX.utils.aoa_to_sheet(materialsRows);
@@ -1588,59 +1473,42 @@ function importPriceSettings(settingsRows) {
 function importMaterialsExcel(event) {
     const file = event.target.files[0];
     if (!file) return;
-    if (typeof XLSX === 'undefined') {
-        alert('Библиотека Excel недоступна. Проверьте интернет.');
-        event.target.value = ''; return;
+    
+    if (typeof XLSX === 'undefined') { 
+        alert('Библиотека Excel недоступна. Проверьте интернет.'); 
+        event.target.value = ""; return; 
     }
+
     const reader = new FileReader();
     reader.onload = function(e) {
         try {
-            const workbook = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
             const materialsSheet = workbook.Sheets['Материалы'] || workbook.Sheets['База_Материалов'] || workbook.Sheets[workbook.SheetNames[0]];
-            const json = XLSX.utils.sheet_to_json(materialsSheet, { defval: '' });
+            const json = XLSX.utils.sheet_to_json(materialsSheet);
             const settingsSheet = workbook.Sheets['Настройки'];
-            const settingsRows = settingsSheet ? XLSX.utils.sheet_to_json(settingsSheet, { defval: '' }) : [];
-            if (!json.length) throw new Error('Файл пуст или неправильного формата.');
+            const settingsRows = settingsSheet ? XLSX.utils.sheet_to_json(settingsSheet) : [];
 
-            const previous = appData.materials.slice();
-            const usedIds = new Set(previous.map(m => String(m.id)));
-            const importedMats = json
-                .filter(row => String(getExcelValue(row, 'Название') || '').trim())
-                .map((row, index) => {
-                const rawId = getExcelValue(row, 'ID (не менять)', 'ID (НЕ МЕНЯТЬ)', 'ID');
-                const name = String(getExcelValue(row, 'Название') || '').trim();
-                const existing = (rawId && previous.find(m => m.id === String(rawId))) || previous.find(m => m.name.trim() === name);
-                const base = existing || previous.find(m => m.name.trim() === name) || defaultAppData.materials[0];
-                let materialId = rawId ? String(rawId).trim() : (existing ? existing.id : '');
-                if (!materialId || (usedIds.has(materialId) && (!existing || existing.id !== materialId))) {
-                    const slug = name.toLowerCase().replace(/[^a-z0-9а-яёіїєґ]+/gi, '_').replace(/^_+|_+$/g, '').slice(0, 50) || 'material';
-                    materialId = `mat_${slug}`;
-                    let n = 2;
-                    while (usedIds.has(materialId)) materialId = `mat_${slug}_${n++}`;
-                }
-                usedIds.add(materialId);
-                const currencyRaw = getExcelValue(row, 'Валюта', 'Валюта (UAH/USD/EUR)');
-                const typeRaw = getExcelValue(row, 'Тип', 'Тип (sheet или roll)');
-                const priceRaw = getExcelValue(row, 'Цена за м²', 'Цена');
-                const scrapRaw = getExcelValue(row, 'Брак, %', 'Брак (%)');
-                const markupRaw = getExcelValue(row, 'Наценка, %', 'Базовая Наценка (%)');
-                const extraRaw = getExcelValue(row, 'Доп. наценка, %', 'Доп Наценка (%)');
-                const primerRaw = getExcelValue(row, 'Праймер', 'Праймер по умолч (true/false)');
-                const modeRaw = getExcelValue(row, 'Режим печати');
-                const currency = ['UAH','USD','EUR'].includes(String(currencyRaw || base.currency).toUpperCase()) ? String(currencyRaw || base.currency).toUpperCase() : base.currency;
+            if (!json || json.length === 0) throw new Error("Файл пуст или неправильного формата");
+
+            const importedMats = json.map((row, index) => {
+                const currency = String(getExcelValue(row, 'Валюта', 'Валюта (UAH/USD/EUR)') || appData.config.baseCurrency).toUpperCase();
+                const modeCode = String(getExcelValue(row, 'Режим печати') || 'MODE_CMYK_STD');
+                const primer = String(getExcelValue(row, 'Праймер', 'Праймер по умолч (true/false)') || '').trim().toLowerCase();
                 return {
-                    id: materialId,
-                    name,
-                    type: String(typeRaw || base.type || 'sheet').toLowerCase() === 'roll' ? 'roll' : 'sheet',
-                    price: priceRaw === '' || priceRaw === undefined ? validNumber(base.price, 0, 0) : validNumber(priceRaw, base.price || 0, 0),
-                    currency,
-                    scrapRate: scrapRaw === '' || scrapRaw === undefined ? validNumber(base.scrapRate, 0, 0) : validNumber(scrapRaw, base.scrapRate * 100, 0) / 100,
-                    baseMarkup: markupRaw === '' || markupRaw === undefined ? validNumber(base.baseMarkup, 0, 0) : validNumber(markupRaw, base.baseMarkup || 0, 0),
-                    extraMarkup: extraRaw === '' || extraRaw === undefined ? validNumber(base.extraMarkup, 0, 0) : validNumber(extraRaw, base.extraMarkup || 0, 0),
-                    defaultPrimer: primerRaw === '' || primerRaw === undefined ? Boolean(base.defaultPrimer) : parseYesNo(primerRaw, Boolean(base.defaultPrimer)),
-                    recommendedMode: appData.printModes[String(modeRaw || base.recommendedMode)] ? String(modeRaw || base.recommendedMode) : (base.recommendedMode || 'MODE_CMYK_STD')
+                    id: getExcelValue(row, 'ID (не менять)', 'ID (НЕ МЕНЯТЬ)') || ('mat_new_' + Date.now() + index),
+                    name: String(getExcelValue(row, 'Название') || 'Материал без названия').trim(),
+                    type: String(getExcelValue(row, 'Тип', 'Тип (sheet или roll)') || '').toLowerCase() === 'roll' ? 'roll' : 'sheet',
+                    price: validNumber(getExcelValue(row, 'Цена за м²', 'Цена'), 0),
+                    currency: ['UAH', 'USD', 'EUR'].includes(currency) ? currency : appData.config.baseCurrency,
+                    scrapRate: validNumber(getExcelValue(row, 'Брак, %', 'Брак (%)'), 0) / 100,
+                    baseMarkup: validNumber(getExcelValue(row, 'Наценка, %', 'Базовая Наценка (%)'), 0),
+                    extraMarkup: validNumber(getExcelValue(row, 'Доп. наценка, %', 'Доп Наценка (%)'), 0),
+                    defaultPrimer: ['true', 'да', 'yes', '1'].includes(primer),
+                    recommendedMode: appData.printModes[modeCode] ? modeCode : 'MODE_CMYK_STD'
                 };
             });
+
             appData.materials = importedMats;
             const importedSettingsCount = importPriceSettings(settingsRows);
             appData.isSavedToFile = false;
@@ -1651,14 +1519,14 @@ function importMaterialsExcel(event) {
             renderMaterialsTable();
             renderPositions();
             saveAppData();
-            alert(`Успешно загружено: ${importedMats.length} материалов${importedSettingsCount ? ` и ${importedSettingsCount} настроек` : ''}. Пустые поля сохранены из текущего прайса/базы, а не превращены в нули.`);
+            alert(`Успешно загружено: ${importedMats.length} материалов${importedSettingsCount ? ` и ${importedSettingsCount} настроек` : ''}.`);
         } catch (err) {
+            alert('Ошибка чтения Excel файла. Проверьте, что вы загружаете скачанный шаблон.');
             console.error(err);
-            alert(`Ошибка чтения Excel: ${err.message}`);
         }
-        event.target.value = '';
+        event.target.value = ""; 
     };
-    reader.readAsArrayBuffer(file);
+    reader.readAsArrayBuffer(file); 
 }
 
 function getOrderFileNamePrefix() {
