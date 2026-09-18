@@ -850,7 +850,7 @@ const defaultAppData = {
     // Базовые значения приладки (не привязаны к режиму печати CMYK/HQ/... — только к рулону/листу).
     // Редактируются в инженерном разделе админки; для отдельных материалов их можно переопределить
     // полями setupFeeRollOverride/setupFeeSheetOverride.
-    setupFeeBase: { rollUah: 250.00, sheetUah: 150.00 },
+    setupFeeBase: { rollUah: 0.00, sheetUah: 0.00 },
     materials: [
         { id: 'mat_film_gloss', name: 'Пленка Ritrama Gloss', type: 'roll', price: 45.00, currency: 'UAH', scrapRate: 0.05, baseMarkup: 50, wasteMarkup: 0, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
         { id: 'mat_banner_440', name: 'Баннер Frontlit 440g', type: 'roll', price: 1.85, currency: 'USD', scrapRate: 0.04, baseMarkup: 40, wasteMarkup: 10, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
