@@ -351,6 +351,9 @@
  * раздел калибровки режимов печати)
  */
 const STORAGE_KEY = 'mimaki-app-state-v13';
+// Ключ предыдущей версии калькулятора — нужен только для одноразового переноса
+// данных (материалы, позиции, настройки), сохранённых до обновления на v13.
+const LEGACY_STORAGE_KEY = 'mimaki-app-state-v12';
 const GOOGLE_DRIVE_SETTINGS_KEY = 'mimaki-google-drive-settings-v1';
 // Полный scope нужен только потому, что общий файл создаётся одним аккаунтом и
 // редактируется другими по прямой ссылке. Приложение обращается только к ID,
@@ -923,11 +926,42 @@ function saveAppData() {
     }, 300);
 }
 
+// Считает, что переданный список материалов — это нетронутые заводские
+// значения (т.е. пользователь их ещё не редактировал). Используется, чтобы
+// понять, можно ли безопасно подставить вместо них перенесённые данные
+// из старой версии калькулятора (см. LEGACY_STORAGE_KEY).
+function isDefaultMaterials(materials) {
+    try {
+        return JSON.stringify(normalizeMaterials(materials)) === JSON.stringify(normalizeMaterials(defaultAppData.materials));
+    } catch (e) { return false; }
+}
+
 function loadAppData() {
+    let migratedFromLegacy = false;
     try {
         const result = localStorage.getItem(STORAGE_KEY);
-        if (result) {
-            const p = JSON.parse(result);
+        let p = result ? JSON.parse(result) : null;
+
+        // Одноразовая миграция: если в новом хранилище (v13) ещё нет
+        // данных, либо там лежат нетронутые заводские материалы, а в
+        // хранилище предыдущей версии (v12) сохранены реально изменённые
+        // пользователем материалы — переносим их автоматически, чтобы
+        // обновление калькулятора не "сбрасывало" прайс, введённый в админке.
+        if (!p || !p.materials || !p.materials.length || isDefaultMaterials(p.materials)) {
+            try {
+                const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+                if (legacyRaw) {
+                    const legacy = JSON.parse(legacyRaw);
+                    if (legacy && legacy.materials && legacy.materials.length && !isDefaultMaterials(legacy.materials)) {
+                        p = legacy;
+                        migratedFromLegacy = true;
+                        console.log('Перенесены данные материалов из предыдущей версии калькулятора (v12 → v13).');
+                    }
+                }
+            } catch (e) { /* старые данные повреждены или отсутствуют — просто игнорируем */ }
+        }
+
+        if (p) {
             if (p.orderName !== undefined) appData.orderName = p.orderName;
             if (p.isSavedToFile !== undefined) appData.isSavedToFile = p.isSavedToFile;
             if (p.config) {
@@ -944,7 +978,9 @@ function loadAppData() {
             if (p.positions) appData.positions = normalizePositions(p.positions);
         }
     } catch (e) { console.log('Сброс к дефолту'); }
-    
+
+    if (migratedFromLegacy) saveAppData(); // сразу фиксируем перенесённые данные в новом хранилище (v13)
+
     document.getElementById('orderClientName').value = appData.orderName || '';
     updateSaveIndicatorUI();
 }
