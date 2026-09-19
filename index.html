@@ -154,13 +154,16 @@
             <button class="btn btn-outline" style="border-color: var(--danger); color: var(--danger);" onclick="startNewOrder()" title="Очистить все позиции и начать новый расчет">🆕 Новый заказ</button>
             
             <input type="text" id="orderClientName" class="form-control" placeholder="Название заказа / Имя клиента" style="width: 250px; font-weight: 600;" onchange="appData.orderName = this.value; appData.isSavedToFile = false; saveAppData();" title="Это название будет использовано в файлах экспорта и в PDF">
+            <span class="cloud-indicator" id="projectDriveIdDisplay" style="font-size:12px;"></span>
         </div>
         <div class="group">
             <span class="save-indicator" id="saveIndicator">💾 сохранено</span>
-            
+
             <!-- Кнопки управления проектами (черновиками заказов) -->
             <button class="btn btn-outline" onclick="document.getElementById('importProjectFile').click()" title="Загрузить отложенный проект заказа (.json)">📂 Открыть проект</button>
             <button class="btn btn-outline" onclick="exportProject()" title="Сохранить текущий расчет как файл-проект на компьютер">💾 Сохранить проект</button>
+            <button class="btn btn-outline" onclick="saveProjectToDrive()" title="Сохранить весь проект (эту заявку) в Google Drive">☁️ Сохранить в Drive</button>
+            <button class="btn btn-outline" onclick="openDriveProjectPicker()" title="Найти и открыть проект из Google Drive по названию или ID">☁️ Открыть из Drive</button>
             <input type="file" id="importProjectFile" style="display:none" accept=".json" onchange="importProject(event)">
 
             <!-- Кнопки экспорта сметы -->
@@ -179,10 +182,21 @@
             <div class="stat-item"><h4>Время работы машины</h4><p id="totalOrderTime">0.00 ч</p></div>
             <div class="stat-item"><h4>Печать / Материалы</h4><p id="totalPrintMatSplit">0 / 0 UAH</p></div>
         </div>
+        <div class="grid" style="margin-bottom: 15px;">
+            <div class="form-group" style="margin:0;">
+                <label style="color: #94a3b8;">Скидка на весь проект (%):</label>
+                <input type="number" min="0" max="100" step="1" class="form-control" id="projectDiscountInput" value="0" onchange="applyProjectDiscount(this.value)" title="Применяется одинаково ко всем позициям сразу. Если скидки на позициях разные, здесь показывается фактическая (средневзвешенная) скидка по проекту.">
+            </div>
+            <div class="form-group" style="margin:0; grid-column: span 2;">
+                <label style="color: #94a3b8;">Примечание к скидке проекта (не попадает в PDF клиенту):</label>
+                <input type="text" class="form-control" id="projectDiscountNote" placeholder="Например: оптовый клиент, компенсация за задержку…" onchange="updateProjectDiscountNote(this.value)">
+            </div>
+        </div>
+        <div id="projectDiscountSummary" style="font-size: 13px; color: #94a3b8; margin-bottom: 8px;"></div>
         <div class="final-sum">
             <div>
                 <h2>ИТОГО К ОПЛАТЕ КЛИЕНТУ:</h2>
-                <small style="color: #94a3b8;">Включает приладки, материалы, праймер и округление позиций до 50 грн</small>
+                <small style="color: #94a3b8;">Включает приладки, материалы, праймер, округление позиций до 50 грн и скидку</small>
             </div>
             <div class="final-sum-val" id="grandTotalDisplay">0.00 UAH</div>
         </div>
@@ -307,7 +321,7 @@
             </table>
         </div>
 
-        <div class="modal-section" style="margin-top: 30px;">☁️ 5. Google Drive: общий прайс и проекты</div>
+        <div class="modal-section" style="margin-top: 30px;">☁️ 5. Google Drive: общий прайс</div>
         <div style="margin-bottom: 15px;">
             <span class="cloud-indicator" id="cloudIndicator">☁️ Drive не настроен</span>
         </div>
@@ -315,18 +329,11 @@
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
             <strong>Порядок работы с общим прайсом:</strong> 1) нажмите «Обновить прайс», чтобы подтянуть последние цены коллег; 2) внесите правки в разделе 4 выше; 3) нажмите «Опубликовать прайс», чтобы сохранить изменения для всех. Прайс также обновляется автоматически раз в минуту и при возврате на вкладку браузера — но только после того, как вы хотя бы раз обновили его вручную в этом браузере.
         </p>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom: 25px;">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom: 10px;">
             <button class="btn btn-outline" onclick="loadPriceFromDrive()" title="Загрузить актуальный общий прайс">↻ Обновить прайс</button>
             <button class="btn btn-outline" style="border-color: var(--success); color: var(--success);" onclick="publishPriceToDrive()" title="Опубликовать изменения прайса для коллег">☁️ Опубликовать прайс</button>
         </div>
-
-        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
-            <strong>Резервная копия текущего заказа</strong> — не общий прайс, а сохранение именно этого расчёта (позиции, клиент) отдельным файлом в Drive. Это альтернатива кнопке «Сохранить проект» на компьютер, чтобы файл был доступен из любого браузера.
-        </p>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button class="btn btn-outline" onclick="saveProjectToDrive()" title="Сохранить весь проект в Google Drive">☁️ Сохранить в Drive</button>
-            <button class="btn btn-outline" onclick="loadProjectFromDrive()" title="Открыть проект из Google Drive по ссылке или ID">☁️ Открыть из Drive</button>
-        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 25px;">Сохранение и поиск самого проекта (заявки) в Drive — на главной странице, рядом с названием заказа, а не здесь: это не настройка, а обычное повседневное действие.</p>
 
         <div style="margin-top: 25px; padding-top: 15px; border-top: 1px dashed var(--border);">
             <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
@@ -377,6 +384,33 @@
         <button class="btn btn-primary" style="width:100%; padding: 12px; font-size: 15px;" onclick="gatedPriceRefresh()" id="priceGateBtn">🔄 Обновить прайс</button>
         <div style="margin-top: 14px;">
             <a href="#" onclick="dismissPriceGate(); return false;" style="font-size: 13px; color: var(--text-muted);">Продолжить без обновления (прайс может быть устаревшим)</a>
+        </div>
+    </div>
+</div>
+
+<!-- Поиск и открытие проекта (заявки) из Google Drive: по названию/части названия,
+     по ID файла, или по вставленной ссылке — чтобы не нужно было помнить точный ID. -->
+<div class="modal" id="driveProjectPickerModal">
+    <div class="modal-content" style="max-width: 640px;">
+        <div class="modal-header">
+            <h2>Открыть проект из Google Drive</h2>
+            <button class="btn btn-outline" onclick="closeDriveProjectPicker()">✕</button>
+        </div>
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Поиск по названию заказа (или части названия):</label>
+            <div style="display:flex; gap:8px;">
+                <input type="text" id="driveSearchInput" class="form-control" placeholder="Например: Иванов, или часть номера заказа" onkeydown="if(event.key==='Enter'){event.preventDefault(); runDriveProjectSearch();}">
+                <button class="btn btn-primary" onclick="runDriveProjectSearch()">🔍 Искать</button>
+            </div>
+        </div>
+        <div id="driveSearchStatus" style="font-size:13px; color:var(--text-muted); margin-bottom:10px;"></div>
+        <div id="driveSearchResults" style="max-height: 260px; overflow-y:auto;"></div>
+        <div style="border-top: 1px solid var(--border); margin: 18px 0 12px; padding-top: 14px;">
+            <label style="font-size:13px; color:var(--text-muted);">Или вставьте ссылку/ID проекта вручную:</label>
+            <div style="display:flex; gap:8px; margin-top:6px;">
+                <input type="text" id="driveManualIdInput" class="form-control" placeholder="Ссылка или ID файла Google Drive">
+                <button class="btn btn-outline" onclick="loadProjectFromDriveManual()">Открыть</button>
+            </div>
         </div>
     </div>
 </div>
@@ -481,7 +515,9 @@ function normalizePosition(raw, index = 0) {
         manualSetupFee: source.manualSetupFee === null || source.manualSetupFee === undefined ? null : validNumber(source.manualSetupFee, null, 0),
         isMediumFormat: Boolean(source.isMediumFormat),
         hasNoStock: Boolean(source.hasNoStock),
-        urgency: ['standard', '24h', 'same_day'].includes(source.urgency) ? source.urgency : 'standard'
+        urgency: ['standard', '24h', 'same_day'].includes(source.urgency) ? source.urgency : 'standard',
+        discountPercent: Math.min(100, validNumber(source.discountPercent, 0, 0)),
+        discountNote: typeof source.discountNote === 'string' ? source.discountNote : ''
     };
 }
 
@@ -598,7 +634,15 @@ async function getGoogleDriveAccessToken() {
             },
             error_callback: (error) => reject(new Error(error.type || 'Окно авторизации Google было закрыто.'))
         });
-        tokenClient.requestAccessToken({ prompt: 'consent' });
+        // prompt: 'consent' заставлял Google показывать полный экран согласия заново
+        // при КАЖДОМ обновлении токена (то есть в каждой новой вкладке и примерно
+        // раз в час), из-за чего "обновить прайс" выглядело не как один клик, а как
+        // прохождение формы разрешений. Пустой prompt — стандартное поведение
+        // Google: если сотрудник уже давал доступ этому приложению раньше в этом же
+        // браузере, окно либо не покажется вовсе, либо попросит в один клик выбрать
+        // аккаунт, без экрана согласия. Сам факт всплывающего окна Google убрать
+        // нельзя — это требование безопасности Google, а не наше решение.
+        tokenClient.requestAccessToken({ prompt: '' });
     });
 }
 
@@ -799,12 +843,28 @@ function buildProjectSnapshot() {
         schemaVersion: 3,
         updatedAt: new Date().toISOString(),
         orderName: appData.orderName,
+        discountNote: appData.discountNote,
         positions: appData.positions,
         config: appData.config,
         setupFeeBase: appData.setupFeeBase,
         printModes: appData.printModes,
         materials: appData.materials
     };
+}
+
+// Показывает ID/ссылку текущего проекта в Drive прямо рядом с названием заказа —
+// иначе его негде найти: ID нигде в интерфейсе не отображался, только хранился
+// в настройках, и сотруднику приходилось запоминать его самому.
+function updateProjectDriveIdDisplay() {
+    const el = document.getElementById('projectDriveIdDisplay');
+    if (!el) return;
+    if (googleDriveSettings.projectFileId) {
+        el.innerHTML = `🔗 В Drive: <a href="https://drive.google.com/file/d/${googleDriveSettings.projectFileId}/view" target="_blank" rel="noopener" style="color: inherit;">${googleDriveSettings.projectFileId}</a>`;
+        el.title = 'ID этого проекта в Google Drive — по нему коллеги смогут его найти';
+    } else {
+        el.innerHTML = '';
+        el.title = '';
+    }
 }
 
 async function saveProjectToDrive() {
@@ -827,6 +887,7 @@ async function saveProjectToDrive() {
         driveState.projectEtag = result.etag;
         appData.isSavedToFile = true;
         saveAppData();
+        updateProjectDriveIdDisplay();
         setCloudStatus('проект сохранён в Drive', 'connected');
         alert(`Проект сохранён в Google Drive.\n\nСсылка: ${result.metadata.webViewLink || `https://drive.google.com/open?id=${result.metadata.id}`}`);
     } catch (error) {
@@ -840,14 +901,92 @@ async function saveProjectToDrive() {
     }
 }
 
-async function loadProjectFromDrive() {
-    const entered = prompt('Вставьте ссылку или ID проекта из Google Drive:', googleDriveSettings.projectFileId || '');
-    if (!entered) return;
+function openDriveProjectPicker() {
+    document.getElementById('driveSearchInput').value = '';
+    document.getElementById('driveManualIdInput').value = '';
+    document.getElementById('driveSearchStatus').textContent = '';
+    document.getElementById('driveSearchResults').innerHTML = '';
+    document.getElementById('driveProjectPickerModal').style.display = 'flex';
+    document.getElementById('driveSearchInput').focus();
+}
+
+function closeDriveProjectPicker() {
+    document.getElementById('driveProjectPickerModal').style.display = 'none';
+}
+
+// Ищет сохранённые в Drive проекты по части названия, а если введённый текст похож
+// на ID/ссылку — дополнительно пробует открыть файл напрямую по ID. Раньше найти
+// сохранённый проект можно было, только если точно помнить его ID или ссылку —
+// на странице проекта их было негде посмотреть и не с чем свериться.
+async function searchDriveProjects(queryText) {
+    const trimmed = (queryText || '').trim();
+    const results = [];
+    if (!trimmed) return results;
+    const token = await getGoogleDriveAccessToken();
+
+    const directId = getDriveFileId(trimmed);
+    if (/^[a-zA-Z0-9_-]{10,}$/.test(directId)) {
+        try {
+            const resp = await fetch(`${GOOGLE_DRIVE_API}/files/${directId}?fields=id,name,modifiedTime,webViewLink&supportsAllDrives=true`, { headers: { Authorization: `Bearer ${token}` } });
+            if (resp.ok) {
+                const meta = await resp.json();
+                results.push({ id: meta.id, name: meta.name, modifiedTime: meta.modifiedTime, matchType: 'id' });
+            }
+        } catch (_) { /* не похоже на реальный ID — просто пропускаем */ }
+    }
+
+    const safeQuery = trimmed.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const q = `name contains '${safeQuery}' and trashed = false and mimeType = 'application/json'`;
+    const resp = await fetch(`${GOOGLE_DRIVE_API}/files?q=${encodeURIComponent(q)}&fields=files(id,name,modifiedTime,webViewLink)&orderBy=modifiedTime desc&pageSize=20`, { headers: { Authorization: `Bearer ${token}` } });
+    if (resp.ok) {
+        const data = await resp.json();
+        (data.files || []).forEach(f => {
+            if (!results.find(r => r.id === f.id)) results.push({ id: f.id, name: f.name, modifiedTime: f.modifiedTime, matchType: 'name' });
+        });
+    }
+    return results;
+}
+
+async function runDriveProjectSearch() {
+    const query = document.getElementById('driveSearchInput').value;
+    const statusEl = document.getElementById('driveSearchStatus');
+    const resultsEl = document.getElementById('driveSearchResults');
+    if (!query.trim()) { statusEl.textContent = 'Введите название заказа или его часть.'; resultsEl.innerHTML = ''; return; }
+    statusEl.textContent = 'Ищем…';
+    resultsEl.innerHTML = '';
+    try {
+        const results = await searchDriveProjects(query);
+        const projectResults = results.filter(r => r.name && r.name.startsWith('Mimaki_Проект_') || r.matchType === 'id');
+        if (!projectResults.length) {
+            statusEl.textContent = 'Ничего не найдено. Проверьте написание или используйте поиск по ID/ссылке ниже.';
+            return;
+        }
+        statusEl.textContent = `Найдено: ${projectResults.length}`;
+        resultsEl.innerHTML = projectResults.map(r => `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:6px; margin-bottom:8px;">
+                <div>
+                    <div style="font-weight:600;">${escapeHtml(r.name)}</div>
+                    <div style="font-size:12px; color:var(--text-muted);">${r.modifiedTime ? new Date(r.modifiedTime).toLocaleString('ru-RU') : ''} ${r.matchType === 'id' ? '· найдено по ID' : ''}</div>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="loadProjectFromDriveById('${r.id}')">Открыть</button>
+            </div>
+        `).join('');
+    } catch (error) {
+        statusEl.textContent = `Ошибка поиска: ${error.message}`;
+    }
+}
+
+function loadProjectFromDriveManual() {
+    const entered = document.getElementById('driveManualIdInput').value;
     const fileId = getDriveFileId(entered);
     if (!fileId) {
         alert('Не удалось определить ID файла Google Drive.');
         return;
     }
+    loadProjectFromDriveById(fileId);
+}
+
+async function loadProjectFromDriveById(fileId) {
     try {
         setCloudStatus('открываем проект из Drive…');
         const remote = await readDriveJson(fileId);
@@ -858,14 +997,17 @@ async function loadProjectFromDrive() {
         if (project.config && Array.isArray(project.materials)) applyPriceSnapshot({ ...project, schema: 'mimaki-price-list' });
         appData.positions = normalizePositions(project.positions);
         appData.orderName = project.orderName || '';
+        appData.discountNote = typeof project.discountNote === 'string' ? project.discountNote : '';
         appData.isSavedToFile = true;
         document.getElementById('orderClientName').value = appData.orderName;
         googleDriveSettings.projectFileId = fileId;
         saveGoogleDriveSettingsToBrowser();
         driveState.projectFileId = fileId;
         driveState.projectEtag = remote.etag;
+        closeDriveProjectPicker();
         renderPositions();
         saveAppData();
+        updateProjectDriveIdDisplay();
         setCloudStatus('проект открыт из Drive', 'connected');
     } catch (error) {
         setCloudStatus('не удалось открыть проект', 'error');
@@ -964,6 +1106,7 @@ async function gatedPriceRefresh() {
 const defaultAppData = {
     orderName: '',
     isSavedToFile: true, // Флаг: сохранен ли текущий проект в .json файл
+    discountNote: '', // Примечание к скидке на весь проект (необязательное, только для внутреннего использования — скрыто в PDF для клиента)
     config: {
         baseCurrency: 'UAH',
         exchangeRates: { UAH: 1.0, USD: 45.00, EUR: 53.00 },
@@ -1011,6 +1154,7 @@ function buildInitialPrintModes() {
 const appData = {
     orderName: '',
     isSavedToFile: true,
+    discountNote: '',
     config: JSON.parse(JSON.stringify(defaultAppData.config)),
     setupFeeBase: JSON.parse(JSON.stringify(defaultAppData.setupFeeBase)),
     materials: JSON.parse(JSON.stringify(defaultAppData.materials)),
@@ -1039,6 +1183,7 @@ function saveAppData() {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 orderName: appData.orderName,
+                discountNote: appData.discountNote,
                 config: appData.config,
                 setupFeeBase: appData.setupFeeBase,
                 printModes: appData.printModes,
@@ -1090,6 +1235,7 @@ function loadAppData() {
 
         if (p) {
             if (p.orderName !== undefined) appData.orderName = p.orderName;
+            if (typeof p.discountNote === 'string') appData.discountNote = p.discountNote;
             if (p.isSavedToFile !== undefined) appData.isSavedToFile = p.isSavedToFile;
             if (p.config) {
                 Object.assign(appData.config, p.config);
@@ -1213,6 +1359,14 @@ function calculatePositionValues(pos) {
     const posGrandTotal = Math.ceil(exactGrandTotal / 50) * 50;
     const unitPrice = pos.quantity > 0 ? posGrandTotal / pos.quantity : 0;
 
+    // Скидка на позицию — применяется поверх уже округлённой до 50 грн цены продажи
+    // (округление до 50 — производственное правило по приладкам/тиражам, а скидка —
+    // отдельное коммерческое решение поверх него).
+    const discountPercent = Math.min(100, Math.max(0, validNumber(pos.discountPercent, 0, 0)));
+    const discountAmount = posGrandTotal * discountPercent / 100;
+    const finalTotal = posGrandTotal - discountAmount;
+    const finalUnitPrice = pos.quantity > 0 ? finalTotal / pos.quantity : 0;
+
     const totalInkElec = directOpCostM2 * printAreaM2;
     const totalAmort = amortM2 * printAreaM2;
     const totalSalaryRent = (salaryM2 + rentM2) * printAreaM2;
@@ -1243,6 +1397,7 @@ function calculatePositionValues(pos) {
         calcTimeH, effTimeH, directOpCostM2, amortM2, salaryM2, rentM2, scrapCostM2, primerM2, fullCostPriceM2,
         matSellM2, matChargedAreaM2, wasteAreaM2, wasteSellM2, wasteCostTotal,
         printSellM2, calcSetupFee, effSetupFee, printTotal, matTotal, exactGrandTotal, posGrandTotal, unitPrice,
+        discountPercent, discountAmount, finalTotal, finalUnitPrice,
         totalProfit, profitPct, profitM2, totalMarkup, markupPct, markupM2,
         warnings
     };
@@ -1264,8 +1419,16 @@ function startNewOrder() {
     if (confirm('Вы уверены, что хотите очистить экран и начать новый заказ?')) {
         appData.positions = [];
         appData.orderName = '';
+        appData.discountNote = '';
         document.getElementById('orderClientName').value = '';
         appData.isSavedToFile = true; // Чистый проект считается сохраненным (не требует сохранения)
+        // Новый заказ — не тот же файл в Drive: отвязываем ID, иначе следующее
+        // «Сохранить в Drive» молча перезапишет старый проект новым.
+        googleDriveSettings.projectFileId = '';
+        saveGoogleDriveSettingsToBrowser();
+        driveState.projectFileId = null;
+        driveState.projectEtag = null;
+        updateProjectDriveIdDisplay();
         addPosition(false); // Добавляем позицию, не помечая проект как "измененный"
     }
 }
@@ -1273,6 +1436,7 @@ function startNewOrder() {
 function exportProject() {
     const projectData = {
         orderName: appData.orderName,
+        discountNote: appData.discountNote,
         positions: appData.positions
     };
     const dataStr = JSON.stringify(projectData, null, 2);
@@ -1298,9 +1462,18 @@ function importProject(event) {
             if (importedData.positions && Array.isArray(importedData.positions)) {
                 appData.positions = normalizePositions(importedData.positions);
                 appData.orderName = importedData.orderName || '';
+                appData.discountNote = typeof importedData.discountNote === 'string' ? importedData.discountNote : '';
                 document.getElementById('orderClientName').value = appData.orderName;
-                
+
                 appData.isSavedToFile = true; // Свежезагруженный проект считается сохраненным
+                // Загруженный из файла проект — не тот же файл, что был связан с Drive
+                // раньше (если был): отвязываем ID, чтобы «Сохранить в Drive» не
+                // перезаписал чужой/старый проект этим содержимым.
+                googleDriveSettings.projectFileId = '';
+                saveGoogleDriveSettingsToBrowser();
+                driveState.projectFileId = null;
+                driveState.projectEtag = null;
+                updateProjectDriveIdDisplay();
                 renderPositions();
                 saveAppData();
                 alert('Проект заказа успешно загружен!');
@@ -1327,7 +1500,8 @@ function addPosition(isUserAction = true) {
         quantity: 1, modeCode: defMat.recommendedMode, usePrimer: defMat.defaultPrimer,
         customScrapRate: defMat.scrapRate, priceTier: 'retail',
         manualTimeH: null, manualSetupFee: null,
-        isMediumFormat: false, hasNoStock: false, urgency: 'standard'
+        isMediumFormat: false, hasNoStock: false, urgency: 'standard',
+        discountPercent: 0, discountNote: ''
     });
     
     if (isUserAction) appData.isSavedToFile = false;
@@ -1401,7 +1575,7 @@ function renderPositions() {
     const container = document.getElementById('positionsContainer');
     container.innerHTML = '';
 
-    let totalAreaAll = 0, totalTimeAll = 0, totalPrintSellAll = 0, totalMatSellAll = 0, grandTotalAll = 0;
+    let totalAreaAll = 0, totalTimeAll = 0, totalPrintSellAll = 0, totalMatSellAll = 0, grandTotalAll = 0, totalDiscountAmountAll = 0, finalGrandTotalAll = 0;
 
     appData.positions.forEach((pos, index) => {
         const calc = calculatePositionValues(pos);
@@ -1416,6 +1590,8 @@ function renderPositions() {
         totalPrintSellAll += calc.printTotal;
         totalMatSellAll += calc.matTotal;
         grandTotalAll += calc.posGrandTotal;
+        totalDiscountAmountAll += calc.discountAmount;
+        finalGrandTotalAll += calc.finalTotal;
 
         const card = document.createElement('div');
         card.className = 'position-card';
@@ -1523,14 +1699,25 @@ function renderPositions() {
                 </div>
             </div>
 
+            <div class="grid" style="margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 12px;">
+                <div class="form-group">
+                    <label>Скидка на позицию (%):</label>
+                    <input type="number" min="0" max="100" step="1" class="form-control user-editable" value="${pos.discountPercent}" onchange="updatePosField(${pos.id}, 'discountPercent', Math.min(100, Math.max(0, Number(this.value))))">
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>Примечание к скидке (необязательно, не попадает в PDF клиенту):</label>
+                    <input type="text" class="form-control user-editable" value="${escapeHtml(pos.discountNote)}" placeholder="Например: постоянный клиент, брак прошлого заказа…" onchange="updatePosField(${pos.id}, 'discountNote', this.value)">
+                </div>
+            </div>
+
             <div class="pos-financials">
                 <div>
                     <strong>Мат-л заготовки:</strong> ${calc.matAreaM2.toFixed(2)} м² | <strong>Площадь печати:</strong> ${calc.printAreaM2.toFixed(2)} м² <br>
-                    <strong>Цена за 1 шт:</strong> ${calc.unitPrice.toFixed(2)} ${appData.config.baseCurrency}
+                    <strong>Цена за 1 шт:</strong> ${calc.finalUnitPrice.toFixed(2)} ${appData.config.baseCurrency}
                 </div>
                 <div class="pos-price">
-                    ${calc.posGrandTotal.toFixed(2)} ${appData.config.baseCurrency}
-                    <small>округлено до 50 грн (было ${calc.exactGrandTotal.toFixed(2)})</small>
+                    ${calc.discountPercent > 0 ? `<span style="text-decoration: line-through; color: var(--text-muted); font-size: 15px; font-weight: 400;">${calc.posGrandTotal.toFixed(2)}</span> ` : ''}${calc.finalTotal.toFixed(2)} ${appData.config.baseCurrency}
+                    <small>округлено до 50 грн (было ${calc.exactGrandTotal.toFixed(2)})${calc.discountPercent > 0 ? ` · скидка ${calc.discountPercent}% (−${calc.discountAmount.toFixed(2)})` : ''}</small>
                 </div>
             </div>
 
@@ -1567,7 +1754,47 @@ function renderPositions() {
     document.getElementById('totalOrderArea').innerText = totalAreaAll.toFixed(2) + ' м²';
     document.getElementById('totalOrderTime').innerText = totalTimeAll.toFixed(2) + ' ч';
     document.getElementById('totalPrintMatSplit').innerText = `${totalPrintSellAll.toFixed(0)} / ${totalMatSellAll.toFixed(0)} ${appData.config.baseCurrency}`;
-    document.getElementById('grandTotalDisplay').innerText = grandTotalAll.toFixed(2) + ' ' + appData.config.baseCurrency;
+
+    // Скидка внизу — двусторонняя: если скидки заданы по отдельным позициям (даже
+    // разные), здесь показывается ФАКТИЧЕСКАЯ средневзвешенная скидка по всему
+    // проекту (просто отражение факта, не редактирование). Если её ввести прямо
+    // здесь — applyProjectDiscount() разнесёт то же значение % на все позиции
+    // (что математически и есть пропорциональное распределение).
+    const effectiveDiscountPct = grandTotalAll > 0 ? (totalDiscountAmountAll / grandTotalAll) * 100 : 0;
+    const discountInputEl = document.getElementById('projectDiscountInput');
+    if (discountInputEl && document.activeElement !== discountInputEl) {
+        discountInputEl.value = effectiveDiscountPct > 0 ? Number(effectiveDiscountPct.toFixed(1)) : 0;
+    }
+    const discountNoteEl = document.getElementById('projectDiscountNote');
+    if (discountNoteEl && document.activeElement !== discountNoteEl) {
+        discountNoteEl.value = appData.discountNote || '';
+    }
+
+    const discountSummaryEl = document.getElementById('projectDiscountSummary');
+    if (discountSummaryEl) {
+        discountSummaryEl.innerHTML = totalDiscountAmountAll > 0
+            ? `Без скидки: ${grandTotalAll.toFixed(2)} ${appData.config.baseCurrency} · Скидка ${effectiveDiscountPct.toFixed(1)}%: −${totalDiscountAmountAll.toFixed(2)} ${appData.config.baseCurrency}`
+            : '';
+    }
+
+    document.getElementById('grandTotalDisplay').innerText = finalGrandTotalAll.toFixed(2) + ' ' + appData.config.baseCurrency;
+}
+
+// Ввод скидки внизу (для всего проекта сразу) применяет один и тот же % ко ВСЕМ
+// позициям — при равном проценте распределение автоматически пропорционально
+// сумме каждой позиции, отдельно ничего пересчитывать не нужно.
+function applyProjectDiscount(value) {
+    const pct = Math.min(100, Math.max(0, Number(value) || 0));
+    appData.positions.forEach(p => { p.discountPercent = pct; });
+    appData.isSavedToFile = false;
+    renderPositions();
+    saveAppData();
+}
+
+function updateProjectDiscountNote(value) {
+    appData.discountNote = value;
+    appData.isSavedToFile = false;
+    saveAppData();
 }
 
 // Перед тем как дать редактировать прайс, проверяем, что он загружен свежим
@@ -1990,7 +2217,17 @@ function getOrderFileNamePrefix() {
 function printClientEstimate() {
     const orderTitle = appData.orderName || 'Смета (Без названия)';
     const dateStr = new Date().toLocaleDateString('ru-RU');
-    
+
+    // Примечания к скидкам — внутренние (обоснование для руководителя/бухгалтерии),
+    // в PDF для клиента не показываются никогда. А вот сам факт и размер скидки —
+    // решение менеджера каждый раз заново: не все клиенты должны видеть, что им
+    // вообще дали скидку и насколько щедро.
+    const hasAnyDiscount = appData.positions.some(p => Number(p.discountPercent) > 0);
+    let showDiscount = false;
+    if (hasAnyDiscount) {
+        showDiscount = confirm('В заказе есть скидка.\n\nПоказать скидку в PDF для клиента?\n\nОК — показать размер скидки\nОтмена — не показывать (клиент увидит только итоговую цену)');
+    }
+
     let html = `<h2>${escapeHtml(orderTitle)}</h2>`;
     html += `<p style="color:#666; margin-bottom: 20px;">Дата формирования: ${dateStr}</p>`;
     html += `<table class="print-table">
@@ -2000,34 +2237,44 @@ function printClientEstimate() {
                     <th>Размер печати (м)</th>
                     <th>Тираж</th>
                     <th>Цена за 1 шт</th>
+                    ${showDiscount ? '<th>Скидка</th>' : ''}
                     <th>Итоговая сумма</th>
                 </tr></thead><tbody>`;
 
     let grandTotal = 0;
+    let grandTotalBeforeDiscount = 0;
     appData.positions.forEach((pos, i) => {
         const calc = calculatePositionValues(pos);
         if (!pos.printWidthM || pos.quantity <= 0) return;
-        
-        grandTotal += calc.posGrandTotal;
+
+        grandTotal += calc.finalTotal;
+        grandTotalBeforeDiscount += calc.posGrandTotal;
         const sizeStr = `${pos.printWidthM.toFixed(2)} x ${pos.printHeightM.toFixed(2)}`;
-        
+        const sumCell = showDiscount && calc.discountPercent > 0
+            ? `<span style="text-decoration:line-through; color:#888; font-weight:400;">${calc.posGrandTotal.toFixed(2)}</span> <strong>${calc.finalTotal.toFixed(2)} ${appData.config.baseCurrency}</strong>`
+            : `<strong>${calc.finalTotal.toFixed(2)} ${appData.config.baseCurrency}</strong>`;
+
         html += `<tr>
                     <td>${i + 1}</td>
                     <td><strong>${escapeHtml(calc.mat.name)}</strong><br><small style="color:#555;">Качество: ${escapeHtml(calc.mode.name.split('(')[0])}</small></td>
                     <td>${sizeStr}</td>
                     <td>${pos.quantity} шт</td>
-                    <td>${calc.unitPrice.toFixed(2)} ${appData.config.baseCurrency}</td>
-                    <td><strong>${calc.posGrandTotal.toFixed(2)} ${appData.config.baseCurrency}</strong></td>
+                    <td>${calc.finalUnitPrice.toFixed(2)} ${appData.config.baseCurrency}</td>
+                    ${showDiscount ? `<td>${calc.discountPercent > 0 ? calc.discountPercent + '%' : '—'}</td>` : ''}
+                    <td>${sumCell}</td>
                  </tr>`;
     });
-    
+
     html += `</tbody></table>`;
+    if (showDiscount && grandTotalBeforeDiscount > grandTotal) {
+        html += `<div style="text-align:right; color:#555; font-size:14px; margin-top:10px;">Сумма без скидки: ${grandTotalBeforeDiscount.toFixed(2)} ${appData.config.baseCurrency} · Скидка: −${(grandTotalBeforeDiscount - grandTotal).toFixed(2)} ${appData.config.baseCurrency}</div>`;
+    }
     html += `<div class="print-total">ИТОГО К ОПЛАТЕ: ${grandTotal.toFixed(2)} ${appData.config.baseCurrency}</div>`;
     html += `<div style="margin-top:40px; font-size:12px; color:#777; text-align:center;">Документ сформирован автоматически</div>`;
 
     const printDiv = document.getElementById('printClientDiv');
     printDiv.innerHTML = html;
-    
+
     document.body.classList.add('client-print-mode');
     window.print();
     document.body.classList.remove('client-print-mode');
@@ -2055,8 +2302,11 @@ function buildExportRows() {
             'Коммерч. печать м²': Number(calc.printSellM2.toFixed(2)),
             'Цена материала м²': Number(calc.matSellM2.toFixed(2)),
             'Приладка': Number(calc.effSetupFee.toFixed(2)),
-            'Цена за 1 шт': Number(calc.unitPrice.toFixed(2)),
-            'Сумма по позиции': Number(calc.posGrandTotal.toFixed(2)),
+            'Цена за 1 шт': Number(calc.finalUnitPrice.toFixed(2)),
+            'Сумма без скидки': Number(calc.posGrandTotal.toFixed(2)),
+            'Скидка, %': calc.discountPercent,
+            'Примечание к скидке': pos.discountNote || '',
+            'Сумма по позиции': Number(calc.finalTotal.toFixed(2)),
             'Валюта': appData.config.baseCurrency
         });
     });
@@ -2106,6 +2356,7 @@ window.onload = () => {
     setCloudStatus(googleDriveSettings.priceFileId ? 'Drive настроен — загрузите прайс' : 'Drive не настроен', googleDriveSettings.priceFileId ? 'warning' : '');
     if (appData.positions.length === 0) addPosition(false); // Загружаем первую пустую позицию без отметки "Изменено"
     else renderPositions();
+    updateProjectDriveIdDisplay();
     // При каждом открытии страницы просим подтвердить/обновить прайс, прежде чем
     // пускать к расчётам — без этого легко посчитать заказ по вчерашним ценам.
     if (googleDriveSettings.priceFileId) showPriceGate('startup');
