@@ -161,18 +161,12 @@
             <!-- Кнопки управления проектами (черновиками заказов) -->
             <button class="btn btn-outline" onclick="document.getElementById('importProjectFile').click()" title="Загрузить отложенный проект заказа (.json)">📂 Открыть проект</button>
             <button class="btn btn-outline" onclick="exportProject()" title="Сохранить текущий расчет как файл-проект на компьютер">💾 Сохранить проект</button>
-            <button class="btn btn-outline" onclick="openGoogleDriveModal()" title="Настроить синхронизацию с Google Drive">☁️ Drive</button>
-            <button class="btn btn-outline" onclick="saveProjectToDrive()" title="Сохранить весь проект в Google Drive">☁️ Сохранить в Drive</button>
-            <button class="btn btn-outline" onclick="loadProjectFromDrive()" title="Открыть проект из Google Drive по ссылке или ID">☁️ Открыть из Drive</button>
             <input type="file" id="importProjectFile" style="display:none" accept=".json" onchange="importProject(event)">
-            
+
             <!-- Кнопки экспорта сметы -->
             <button class="btn btn-outline" style="border-color: var(--success); color: var(--success);" onclick="printClientEstimate()">🖨️ PDF для клиента</button>
             <button class="btn btn-outline" onclick="exportOrderCSV()">⬇️ CSV (Заказ)</button>
             <button class="btn btn-outline" onclick="exportOrderExcel()">📊 Excel (Заказ)</button>
-            <button class="btn btn-outline" onclick="loadPriceFromDrive()" title="Загрузить актуальный общий прайс">↻ Обновить прайс</button>
-            <button class="btn btn-outline" style="border-color: var(--success); color: var(--success);" onclick="publishPriceToDrive()" title="Опубликовать изменения прайса для коллег">☁️ Опубликовать прайс</button>
-            <span class="cloud-indicator" id="cloudIndicator">☁️ Drive не настроен</span>
         </div>
     </div>
 
@@ -311,6 +305,34 @@
                 </thead>
                 <tbody id="materialsTableBody"></tbody>
             </table>
+        </div>
+
+        <div class="modal-section" style="margin-top: 30px;">☁️ 5. Google Drive: общий прайс и проекты</div>
+        <div style="margin-bottom: 15px;">
+            <span class="cloud-indicator" id="cloudIndicator">☁️ Drive не настроен</span>
+        </div>
+
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+            <strong>Порядок работы с общим прайсом:</strong> 1) нажмите «Обновить прайс», чтобы подтянуть последние цены коллег; 2) внесите правки в разделе 4 выше; 3) нажмите «Опубликовать прайс», чтобы сохранить изменения для всех. Прайс также обновляется автоматически раз в минуту и при возврате на вкладку браузера — но только после того, как вы хотя бы раз обновили его вручную в этом браузере.
+        </p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom: 25px;">
+            <button class="btn btn-outline" onclick="loadPriceFromDrive()" title="Загрузить актуальный общий прайс">↻ Обновить прайс</button>
+            <button class="btn btn-outline" style="border-color: var(--success); color: var(--success);" onclick="publishPriceToDrive()" title="Опубликовать изменения прайса для коллег">☁️ Опубликовать прайс</button>
+        </div>
+
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+            <strong>Резервная копия текущего заказа</strong> — не общий прайс, а сохранение именно этого расчёта (позиции, клиент) отдельным файлом в Drive. Это альтернатива кнопке «Сохранить проект» на компьютер, чтобы файл был доступен из любого браузера.
+        </p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-outline" onclick="saveProjectToDrive()" title="Сохранить весь проект в Google Drive">☁️ Сохранить в Drive</button>
+            <button class="btn btn-outline" onclick="loadProjectFromDrive()" title="Открыть проект из Google Drive по ссылке или ID">☁️ Открыть из Drive</button>
+        </div>
+
+        <div style="margin-top: 25px; padding-top: 15px; border-top: 1px dashed var(--border);">
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+                <strong>⚙️ Настройки подключения к Drive</strong> — технические параметры (Client ID, ID файла прайса). Уже заданы по умолчанию, трогать обычно не нужно. Открывайте это только чтобы подключить нового сотрудника вручную или сменить общий файл прайса.
+            </p>
+            <button class="btn btn-outline" onclick="openGoogleDriveModal()" title="Настроить синхронизацию с Google Drive">⚙️ Настройки Drive</button>
         </div>
 
         <div style="margin-top: 25px; text-align: right;">
