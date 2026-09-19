@@ -361,6 +361,12 @@ const GOOGLE_DRIVE_SETTINGS_KEY = 'mimaki-google-drive-settings-v1';
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
 const GOOGLE_DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const GOOGLE_DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
+// Настройки по умолчанию, чтобы коллегам не нужно было вручную вводить Client ID
+// и ID общего прайса в каждом новом браузере. Не секреты: Client ID предназначен
+// для публичного использования на стороне браузера, а доступ к файлу прайса
+// определяется правами на Google Drive, а не знанием его ID.
+const DEFAULT_GOOGLE_CLIENT_ID = '94907071030-b7efl59619cv8avhuok6lnrfj2rvq7l9.apps.googleusercontent.com';
+const DEFAULT_GOOGLE_PRICE_FILE_ID = '1uWt0mazZFZj7hoAVH8gkFkzKKKHLIQxN';
 
 let googleDriveSettings = loadGoogleDriveSettings();
 const driveState = {
@@ -378,12 +384,12 @@ function loadGoogleDriveSettings() {
     try {
         const saved = JSON.parse(localStorage.getItem(GOOGLE_DRIVE_SETTINGS_KEY) || '{}');
         return {
-            clientId: typeof saved.clientId === 'string' ? saved.clientId : '',
-            priceFileId: typeof saved.priceFileId === 'string' ? saved.priceFileId : '',
+            clientId: typeof saved.clientId === 'string' && saved.clientId ? saved.clientId : DEFAULT_GOOGLE_CLIENT_ID,
+            priceFileId: typeof saved.priceFileId === 'string' && saved.priceFileId ? saved.priceFileId : DEFAULT_GOOGLE_PRICE_FILE_ID,
             projectFileId: typeof saved.projectFileId === 'string' ? saved.projectFileId : ''
         };
     } catch (_) {
-        return { clientId: '', priceFileId: '', projectFileId: '' };
+        return { clientId: DEFAULT_GOOGLE_CLIENT_ID, priceFileId: DEFAULT_GOOGLE_PRICE_FILE_ID, projectFileId: '' };
     }
 }
 
