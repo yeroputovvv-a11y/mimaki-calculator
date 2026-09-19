@@ -366,6 +366,21 @@
     </div>
 </div>
 
+<!-- Окно-заслонка: просит обновить общий прайс перед работой, чтобы расчёты и правки
+     в админке не велись на устаревших/несинхронизированных ценах. -->
+<div class="modal" id="priceGateModal" style="z-index: 2000;">
+    <div class="modal-content" style="max-width: 460px; text-align: center;">
+        <div style="font-size: 38px; margin-bottom: 8px;">☁️</div>
+        <h2 id="priceGateTitle" style="margin-bottom: 8px;">Обновите прайс перед работой</h2>
+        <p id="priceGateText" style="color: var(--text-muted); margin-bottom: 18px; font-size: 14px;">Прайс материалов мог измениться с последнего раза. Обновите его, чтобы расчёт был точным.</p>
+        <div id="priceGateError" class="warning-box" style="display:none; text-align:left; background:#fef2f2; border-color:#fecaca; color:var(--danger);"></div>
+        <button class="btn btn-primary" style="width:100%; padding: 12px; font-size: 15px;" onclick="gatedPriceRefresh()" id="priceGateBtn">🔄 Обновить прайс</button>
+        <div style="margin-top: 14px;">
+            <a href="#" onclick="dismissPriceGate(); return false;" style="font-size: 13px; color: var(--text-muted);">Продолжить без обновления (прайс может быть устаревшим)</a>
+        </div>
+    </div>
+</div>
+
 <script>
 /**
  * БАЗА ДАННЫХ И КОНФИГУРАЦИЯ (v13 - Раздельная наценка материал/перерасход,
@@ -399,7 +414,9 @@ const driveState = {
     priceDirty: false,
     projectEtag: null,
     projectFileId: null,
-    refreshTimer: null
+    refreshTimer: null,
+    priceGateDismissedAt: null,
+    pendingAdminOpen: false
 };
 
 function loadGoogleDriveSettings() {
@@ -859,7 +876,89 @@ async function loadProjectFromDrive() {
 function startDrivePricePolling() {
     if (driveState.refreshTimer) clearInterval(driveState.refreshTimer);
     if (!googleDriveSettings.priceFileId) return;
-    driveState.refreshTimer = setInterval(() => loadPriceFromDrive({ silent: true, auto: true }), 60000);
+    driveState.refreshTimer = setInterval(autoRefreshPrice, 60000);
+}
+
+// Доступ к Drive выдаётся максимум на ~час и не сохраняется между перезагрузками
+// страницы, поэтому автообновление в фоне может работать молча только пока токен
+// ещё жив. Как только он пропал/истёк, тихо ничего не делать нельзя — иначе
+// сотрудник может часами работать по устаревшим ценам, не заметив этого. В этом
+// случае показываем ту же заслонку, что и при открытии страницы, но не чаще
+// одного раза в 5 минут, чтобы не дёргать человека на каждый тик таймера.
+function autoRefreshPrice() {
+    if (!googleDriveSettings.priceFileId) return;
+    if (document.getElementById('priceGateModal').style.display === 'flex') return;
+    const tokenFresh = driveState.accessToken && Date.now() < driveState.accessTokenExpiresAt - 60000;
+    if (!tokenFresh) {
+        if (driveState.priceGateDismissedAt && Date.now() - driveState.priceGateDismissedAt < 5 * 60 * 1000) return;
+        showPriceGate('stale');
+        return;
+    }
+    loadPriceFromDrive({ silent: true, auto: true });
+}
+
+// Заслонка, требующая обновить общий прайс, прежде чем продолжать работу.
+// reason: 'startup' — при открытии страницы; 'stale' — токен доступа истёк,
+// пока страница была открыта; 'admin' — перед правкой цен в админке (чтобы не
+// затереть изменения коллег). У заслонки всегда есть путь "продолжить без
+// обновления" — полная блокировка недопустима, если Drive/интернет недоступны,
+// иначе калькулятор станет бесполезен в самый нужный момент.
+function showPriceGate(reason) {
+    if (!googleDriveSettings.priceFileId) return;
+    const titleEl = document.getElementById('priceGateTitle');
+    const textEl = document.getElementById('priceGateText');
+    if (reason === 'stale') {
+        titleEl.textContent = 'Прайс давно не обновлялся';
+        textEl.textContent = 'Доступ к Drive истёк, пока страница была открыта. Обновите прайс, чтобы продолжить работать с актуальными ценами.';
+    } else if (reason === 'admin') {
+        titleEl.textContent = 'Обновите прайс перед правкой';
+        textEl.textContent = 'Чтобы не затереть изменения коллег, сначала загрузите актуальный прайс — потом можно редактировать.';
+    } else {
+        titleEl.textContent = 'Обновите прайс перед работой';
+        textEl.textContent = 'Прайс материалов мог измениться с последнего раза. Обновите его, чтобы расчёт был точным.';
+    }
+    document.getElementById('priceGateError').style.display = 'none';
+    const modal = document.getElementById('priceGateModal');
+    modal.dataset.reason = reason;
+    modal.style.display = 'flex';
+}
+
+function hidePriceGate() {
+    document.getElementById('priceGateModal').style.display = 'none';
+}
+
+function dismissPriceGate() {
+    const reason = document.getElementById('priceGateModal').dataset.reason;
+    hidePriceGate();
+    driveState.priceGateDismissedAt = Date.now();
+    setCloudStatus('работаем без обновления прайса', 'warning');
+    if (reason === 'admin' && driveState.pendingAdminOpen) {
+        driveState.pendingAdminOpen = false;
+        reallyOpenAdminModal();
+    }
+}
+
+async function gatedPriceRefresh() {
+    const btn = document.getElementById('priceGateBtn');
+    const errEl = document.getElementById('priceGateError');
+    errEl.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Обновляем…';
+    const reason = document.getElementById('priceGateModal').dataset.reason;
+    const ok = await loadPriceFromDrive({});
+    btn.disabled = false;
+    btn.textContent = '🔄 Обновить прайс';
+    if (ok) {
+        driveState.priceGateDismissedAt = null;
+        hidePriceGate();
+        if (reason === 'admin' && driveState.pendingAdminOpen) {
+            driveState.pendingAdminOpen = false;
+            reallyOpenAdminModal();
+        }
+    } else {
+        errEl.textContent = 'Не удалось обновить прайс. Проверьте подключение к интернету и повторите, либо продолжите без обновления.';
+        errEl.style.display = 'block';
+    }
 }
 
 const defaultAppData = {
@@ -1471,7 +1570,20 @@ function renderPositions() {
     document.getElementById('grandTotalDisplay').innerText = grandTotalAll.toFixed(2) + ' ' + appData.config.baseCurrency;
 }
 
+// Перед тем как дать редактировать прайс, проверяем, что он загружен свежим
+// в этом сеансе (есть живой accessToken из недавнего loadPriceFromDrive) —
+// иначе можно незаметно исправить цены поверх устаревших и потерять правки
+// коллег. Если нет — сперва показываем заслонку с предложением обновить.
 function openAdminModal() {
+    if (googleDriveSettings.priceFileId && (!driveState.accessToken || Date.now() >= driveState.accessTokenExpiresAt - 60000)) {
+        driveState.pendingAdminOpen = true;
+        showPriceGate('admin');
+        return;
+    }
+    reallyOpenAdminModal();
+}
+
+function reallyOpenAdminModal() {
     const c = appData.config;
     document.getElementById('cfgBaseCurrency').value = c.baseCurrency;
     document.getElementById('cfgElecTariff').value = c.elecTariffKwh;
@@ -1989,11 +2101,14 @@ window.onload = () => {
     document.getElementById('dispUsdRate').innerText = appData.config.exchangeRates.USD.toFixed(2);
     document.getElementById('dispEurRate').innerText = appData.config.exchangeRates.EUR.toFixed(2);
     document.getElementById('materialsTableBody').addEventListener('change', markPriceChanged);
-    window.addEventListener('focus', () => loadPriceFromDrive({ silent: true, auto: true }));
+    window.addEventListener('focus', autoRefreshPrice);
     startDrivePricePolling();
     setCloudStatus(googleDriveSettings.priceFileId ? 'Drive настроен — загрузите прайс' : 'Drive не настроен', googleDriveSettings.priceFileId ? 'warning' : '');
     if (appData.positions.length === 0) addPosition(false); // Загружаем первую пустую позицию без отметки "Изменено"
     else renderPositions();
+    // При каждом открытии страницы просим подтвердить/обновить прайс, прежде чем
+    // пускать к расчётам — без этого легко посчитать заказ по вчерашним ценам.
+    if (googleDriveSettings.priceFileId) showPriceGate('startup');
 };
 </script>
 </body>
