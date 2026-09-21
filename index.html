@@ -397,9 +397,9 @@
             <button class="btn btn-outline" onclick="closeDriveProjectPicker()">✕</button>
         </div>
         <div class="form-group" style="margin-bottom: 10px;">
-            <label>Поиск по названию заказа (или части названия):</label>
+            <label>Поиск по номеру заказа (например, 1001) или по названию:</label>
             <div style="display:flex; gap:8px;">
-                <input type="text" id="driveSearchInput" class="form-control" placeholder="Например: Иванов, или часть номера заказа" onkeydown="if(event.key==='Enter'){event.preventDefault(); runDriveProjectSearch();}">
+                <input type="text" id="driveSearchInput" class="form-control" placeholder="Например: 1001, или Иванов" onkeydown="if(event.key==='Enter'){event.preventDefault(); runDriveProjectSearch();}">
                 <button class="btn btn-primary" onclick="runDriveProjectSearch()">🔍 Искать</button>
             </div>
         </div>
@@ -843,6 +843,7 @@ function buildProjectSnapshot() {
         schemaVersion: 3,
         updatedAt: new Date().toISOString(),
         orderName: appData.orderName,
+        orderNumber: appData.orderNumber,
         discountNote: appData.discountNote,
         positions: appData.positions,
         config: appData.config,
@@ -852,24 +853,77 @@ function buildProjectSnapshot() {
     };
 }
 
-// Показывает ID/ссылку текущего проекта в Drive прямо рядом с названием заказа —
-// иначе его негде найти: ID нигде в интерфейсе не отображался, только хранился
-// в настройках, и сотруднику приходилось запоминать его самому.
+// Показывает номер заказа и ссылку на проект в Drive прямо рядом с названием
+// заказа — иначе их негде найти. Номер (напр. №1001) — короткий и его можно
+// просто записать или запомнить, в отличие от длинного ID файла Google Drive.
 function updateProjectDriveIdDisplay() {
     const el = document.getElementById('projectDriveIdDisplay');
     if (!el) return;
     if (googleDriveSettings.projectFileId) {
-        el.innerHTML = `🔗 В Drive: <a href="https://drive.google.com/file/d/${googleDriveSettings.projectFileId}/view" target="_blank" rel="noopener" style="color: inherit;">${googleDriveSettings.projectFileId}</a>`;
-        el.title = 'ID этого проекта в Google Drive — по нему коллеги смогут его найти';
+        const numberPart = appData.orderNumber ? `<strong>№${appData.orderNumber}</strong> · ` : '';
+        el.innerHTML = `🔢 ${numberPart}<a href="https://drive.google.com/file/d/${googleDriveSettings.projectFileId}/view" target="_blank" rel="noopener" style="color: inherit;">открыть в Drive</a>`;
+        el.title = appData.orderNumber
+            ? `Номер заказа №${appData.orderNumber} — запишите или запомните его, чтобы потом быстро найти проект`
+            : 'Ссылка на этот проект в Google Drive';
     } else {
         el.innerHTML = '';
         el.title = '';
     }
 }
 
+// Присваивает проекту короткий "человеческий" номер (напр. №1001), который
+// менеджер может записать на бумажке или запомнить — в отличие от длинного ID
+// файла Google Drive. Номер выдаётся один раз при первом сохранении в Drive и
+// дальше хранится в самом проекте (повторные сохранения его не меняют).
+// Ведётся в общем счётчике на Drive (Mimaki_Order_Counter.json), доступном
+// всем сотрудникам, с защитой от гонки через ETag (If-Match) — если коллега
+// успел увеличить счётчик первым, просто читаем заново и пробуем ещё раз.
+async function getOrCreateOrderNumber() {
+    if (appData.orderNumber) return appData.orderNumber;
+    try {
+        const token = await getGoogleDriveAccessToken();
+        const q = `name = 'Mimaki_Order_Counter.json' and trashed = false and mimeType = 'application/json'`;
+        const listResp = await fetch(`${GOOGLE_DRIVE_API}/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=1`, { headers: { Authorization: `Bearer ${token}` } });
+        let counterFileId = null;
+        if (listResp.ok) {
+            const listData = await listResp.json();
+            if (listData.files && listData.files.length) counterFileId = listData.files[0].id;
+        }
+        let nextNumber;
+        if (!counterFileId) {
+            // Счётчика ещё нигде нет — создаём с первого номера.
+            nextNumber = 1001;
+            const created = await createDriveJson('Mimaki_Order_Counter.json', { lastNumber: nextNumber });
+            counterFileId = created.metadata.id;
+        } else {
+            let saved = false;
+            for (let attempt = 0; attempt < 5 && !saved; attempt++) {
+                const remote = await readDriveJson(counterFileId);
+                nextNumber = (Number(remote.data && remote.data.lastNumber) || 1000) + 1;
+                try {
+                    await updateDriveJson(counterFileId, { lastNumber: nextNumber }, remote.etag);
+                    saved = true;
+                } catch (e) {
+                    if (e.status !== 412) throw e; // не гонка за счётчиком — другая ошибка, дальше нет смысла пробовать
+                }
+            }
+            if (!saved) return null;
+        }
+        appData.orderNumber = nextNumber;
+        saveAppData();
+        return nextNumber;
+    } catch (e) {
+        // Не удалось выдать номер (нет сети, нет доступа и т.п.) — не блокируем
+        // сохранение самого проекта, просто оставляем его без номера.
+        return null;
+    }
+}
+
 async function saveProjectToDrive() {
     try {
-        const fileName = `Mimaki_Проект_${getOrderFileNamePrefix()}.json`;
+        await getOrCreateOrderNumber();
+        const numberPart = appData.orderNumber ? `№${appData.orderNumber}_` : '';
+        const fileName = `Mimaki_Проект_${numberPart}${getOrderFileNamePrefix()}.json`;
         let result;
         if (googleDriveSettings.projectFileId) {
             if (!driveState.projectEtag || driveState.projectFileId !== googleDriveSettings.projectFileId) {
@@ -997,6 +1051,7 @@ async function loadProjectFromDriveById(fileId) {
         if (project.config && Array.isArray(project.materials)) applyPriceSnapshot({ ...project, schema: 'mimaki-price-list' });
         appData.positions = normalizePositions(project.positions);
         appData.orderName = project.orderName || '';
+        appData.orderNumber = project.orderNumber || null;
         appData.discountNote = typeof project.discountNote === 'string' ? project.discountNote : '';
         appData.isSavedToFile = true;
         document.getElementById('orderClientName').value = appData.orderName;
@@ -1105,6 +1160,7 @@ async function gatedPriceRefresh() {
 
 const defaultAppData = {
     orderName: '',
+    orderNumber: null, // Короткий "человеческий" номер заказа (напр. 1001) — выдаётся при первом сохранении в Drive
     isSavedToFile: true, // Флаг: сохранен ли текущий проект в .json файл
     discountNote: '', // Примечание к скидке на весь проект (необязательное, только для внутреннего использования — скрыто в PDF для клиента)
     config: {
@@ -1153,6 +1209,7 @@ function buildInitialPrintModes() {
 
 const appData = {
     orderName: '',
+    orderNumber: null,
     isSavedToFile: true,
     discountNote: '',
     config: JSON.parse(JSON.stringify(defaultAppData.config)),
@@ -1183,6 +1240,7 @@ function saveAppData() {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 orderName: appData.orderName,
+                orderNumber: appData.orderNumber,
                 discountNote: appData.discountNote,
                 config: appData.config,
                 setupFeeBase: appData.setupFeeBase,
@@ -1235,6 +1293,7 @@ function loadAppData() {
 
         if (p) {
             if (p.orderName !== undefined) appData.orderName = p.orderName;
+            if (p.orderNumber !== undefined) appData.orderNumber = p.orderNumber;
             if (typeof p.discountNote === 'string') appData.discountNote = p.discountNote;
             if (p.isSavedToFile !== undefined) appData.isSavedToFile = p.isSavedToFile;
             if (p.config) {
@@ -1419,6 +1478,7 @@ function startNewOrder() {
     if (confirm('Вы уверены, что хотите очистить экран и начать новый заказ?')) {
         appData.positions = [];
         appData.orderName = '';
+        appData.orderNumber = null;
         appData.discountNote = '';
         document.getElementById('orderClientName').value = '';
         appData.isSavedToFile = true; // Чистый проект считается сохраненным (не требует сохранения)
@@ -1436,6 +1496,7 @@ function startNewOrder() {
 function exportProject() {
     const projectData = {
         orderName: appData.orderName,
+        orderNumber: appData.orderNumber,
         discountNote: appData.discountNote,
         positions: appData.positions
     };
@@ -1462,6 +1523,7 @@ function importProject(event) {
             if (importedData.positions && Array.isArray(importedData.positions)) {
                 appData.positions = normalizePositions(importedData.positions);
                 appData.orderName = importedData.orderName || '';
+                appData.orderNumber = importedData.orderNumber || null;
                 appData.discountNote = typeof importedData.discountNote === 'string' ? importedData.discountNote : '';
                 document.getElementById('orderClientName').value = appData.orderName;
 
