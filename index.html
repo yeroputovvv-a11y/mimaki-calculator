@@ -1078,17 +1078,20 @@ function startDrivePricePolling() {
 
 // Доступ к Drive выдаётся максимум на ~час и не сохраняется между перезагрузками
 // страницы, поэтому автообновление в фоне может работать молча только пока токен
-// ещё жив. Как только он пропал/истёк, тихо ничего не делать нельзя — иначе
-// сотрудник может часами работать по устаревшим ценам, не заметив этого. В этом
-// случае показываем ту же заслонку, что и при открытии страницы, но не чаще
-// одного раза в 5 минут, чтобы не дёргать человека на каждый тик таймера.
+// ещё жив. Раньше, как только он пропадал/истекал, здесь всплывала та же
+// заслонка, что и при открытии страницы — именно из-за неё окно с просьбой
+// обновить прайс вылезало на каждый возврат на вкладку (событие focus). Теперь
+// вместо навязчивого окна — просто спокойное напоминание в статусной строке, не
+// чаще раза в 5 минут: прайс из локального кэша остаётся в работе, а обновить
+// его в любой момент можно вручную кнопкой «↻ Обновить прайс».
 function autoRefreshPrice() {
     if (!googleDriveSettings.priceFileId) return;
     if (document.getElementById('priceGateModal').style.display === 'flex') return;
     const tokenFresh = driveState.accessToken && Date.now() < driveState.accessTokenExpiresAt - 60000;
     if (!tokenFresh) {
         if (driveState.priceGateDismissedAt && Date.now() - driveState.priceGateDismissedAt < 5 * 60 * 1000) return;
-        showPriceGate('stale');
+        driveState.priceGateDismissedAt = Date.now();
+        setCloudStatus('доступ к Drive истёк — обновите прайс кнопкой ↻, если нужно', 'warning');
         return;
     }
     loadPriceFromDrive({ silent: true, auto: true });
@@ -2415,13 +2418,17 @@ window.onload = () => {
     document.getElementById('materialsTableBody').addEventListener('change', markPriceChanged);
     window.addEventListener('focus', autoRefreshPrice);
     startDrivePricePolling();
-    setCloudStatus(googleDriveSettings.priceFileId ? 'Drive настроен — загрузите прайс' : 'Drive не настроен', googleDriveSettings.priceFileId ? 'warning' : '');
+    setCloudStatus(googleDriveSettings.priceFileId ? 'Drive настроен — прайс из локального кэша' : 'Drive не настроен', googleDriveSettings.priceFileId ? 'warning' : '');
     if (appData.positions.length === 0) addPosition(false); // Загружаем первую пустую позицию без отметки "Изменено"
     else renderPositions();
     updateProjectDriveIdDisplay();
-    // При каждом открытии страницы просим подтвердить/обновить прайс, прежде чем
-    // пускать к расчётам — без этого легко посчитать заказ по вчерашним ценам.
-    if (googleDriveSettings.priceFileId) showPriceGate('startup');
+    // Раньше здесь при каждом открытии страницы всплывала заслонка с просьбой
+    // обновить прайс — то самое навязчивое окно, которое мешало работать.
+    // Теперь калькулятор просто продолжает работать с последним известным
+    // прайсом (он сохранён локально в браузере), а обновить его в любой
+    // момент можно вручную кнопкой «↻ Обновить прайс» в тулбаре. Пока
+    // страница открыта и доступ к Drive ещё живой, свежий прайс всё равно
+    // подтягивается в фоне сам (см. autoRefreshPrice/startDrivePricePolling).
 };
 </script>
 </body>
