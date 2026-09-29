@@ -99,6 +99,32 @@
         .mat-table th { background: #f1f5f9; font-weight: 600; }
         .mat-table input, .mat-table select { width: 100%; padding: 4px 6px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; }
 
+        /* Доп. работы (допечатные / постпечатные) в карточке позиции и услуги на весь заказ */
+        .works-block { margin: 10px 0 5px; border: 1px solid var(--border); border-radius: 8px; background: #fcfdff; }
+        .works-block > summary { cursor: pointer; padding: 10px 14px; font-size: 14px; font-weight: 700; color: var(--primary); list-style: none; display: flex; align-items: baseline; gap: 6px 10px; flex-wrap: wrap; }
+        .works-block > summary::-webkit-details-marker { display: none; }
+        .works-block > summary::before { content: '▸'; width: 12px; }
+        .works-block[open] > summary::before { content: '▾'; }
+        .works-block .works-summary-sum { font-weight: 600; color: var(--text-muted); font-size: 13px; margin-left: auto; }
+        .works-list { padding: 4px 14px 12px; display: flex; flex-direction: column; gap: 6px; }
+        .work-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 6px 8px; border-radius: 6px; font-size: 13px; }
+        .work-row.active { background: #eff6ff; }
+        .work-row .work-name { min-width: 230px; flex: 1 1 230px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        .work-row .work-unit-hint { color: var(--text-muted); font-size: 11px; }
+        .work-row .work-params { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .work-row .work-params label { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+        .work-row .work-params input, .work-row .work-params select { padding: 4px 6px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; }
+        .work-row .work-params input[type=number] { width: 80px; }
+        .work-row .work-sum { margin-left: auto; font-weight: 700; white-space: nowrap; min-width: 110px; text-align: right; }
+        .work-note { flex-basis: 100%; font-size: 12px; padding: 4px 8px; border-radius: 4px; }
+        .work-note.warn { background: #fffbeb; color: #b45309; border: 1px solid #fef3c7; }
+        .work-note.err { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; }
+        .services-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); padding: 16px 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .services-card h3 { font-size: 15px; color: var(--primary); margin-bottom: 8px; }
+        .groups-cell { display: flex; flex-wrap: wrap; gap: 2px 8px; min-width: 190px; }
+        .groups-cell label { display: flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; }
+        .groups-cell input { width: auto !important; }
+
         .save-indicator { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
         .save-indicator.saving { color: var(--warning); }
         .save-indicator.saved { color: var(--success); }
@@ -175,12 +201,21 @@
 
     <div id="positionsContainer"></div>
 
+    <!-- Услуги, которые относятся к заказу целиком, а не к отдельной позиции
+         (дизайнер, допечатная подготовка и т.п.). Список берётся из справочника
+         работ в админке — все работы с единицей «час» или «за заказ». -->
+    <div class="services-card" id="orderServicesCard">
+        <h3>🧑‍🎨 Услуги на весь заказ</h3>
+        <div id="orderServicesList"></div>
+    </div>
+
     <div class="grand-total-card">
         <div class="grand-total-grid">
             <div class="stat-item"><h4>Всего позиций</h4><p id="totalPositionsCount">0</p></div>
             <div class="stat-item"><h4>Общая площадь печати</h4><p id="totalOrderArea">0.00 м²</p></div>
             <div class="stat-item"><h4>Время работы машины</h4><p id="totalOrderTime">0.00 ч</p></div>
             <div class="stat-item"><h4>Печать / Материалы</h4><p id="totalPrintMatSplit">0 / 0 UAH</p></div>
+            <div class="stat-item"><h4>Доп. работы и услуги</h4><p id="totalWorksSum">0 UAH</p></div>
         </div>
         <div class="grid" style="margin-bottom: 15px;">
             <div class="form-group" style="margin:0;">
@@ -196,7 +231,7 @@
         <div class="final-sum">
             <div>
                 <h2>ИТОГО К ОПЛАТЕ КЛИЕНТУ:</h2>
-                <small style="color: #94a3b8;">Включает приладки, материалы, праймер, округление позиций до 50 грн и скидку</small>
+                <small style="color: #94a3b8;">Включает приладки, материалы, праймер, доп. работы, услуги, округление позиций до 50 грн и скидку</small>
             </div>
             <div class="final-sum-val" id="grandTotalDisplay">0.00 UAH</div>
         </div>
@@ -298,14 +333,15 @@
                 <button class="btn btn-primary btn-sm" onclick="addNewMaterialRow()">➕ Добавить строку ручками</button>
             </div>
         </div>
-        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">* Экспорт создаёт обычную таблицу Excel с листами «Инструкция», «Материалы» и «Настройки». В ней можно менять цены, добавлять материалы и обновлять тарифы без программирования.</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">* Экспорт создаёт обычную таблицу Excel с листами «Инструкция», «Материалы», «Настройки», «Режимы печати», «Расходники» и «Работы». В ней можно менять цены, добавлять материалы, расходники и работы без программирования. При импорте заменяются только те разделы, листы которых есть в файле — например, файл только с листами «Расходники» и «Работы» не тронет материалы.</p>
 
         <div style="overflow-x: auto;">
             <table class="mat-table">
                 <thead>
                     <tr>
-                        <th style="width: 30%;">Название материала</th>
-                        <th style="width: 15%;">Тип по умолч.</th>
+                        <th style="width: 24%;">Название материала</th>
+                        <th style="width: 11%;" title="От группы зависит, какие доп. работы предлагаются менеджеру для этого материала">Группа (для доп. работ)</th>
+                        <th style="width: 10%;">Тип по умолч.</th>
                         <th style="width: 12%;">Цена за м²</th>
                         <th style="width: 10%;">Валюта</th>
                         <th style="width: 8%;">Брак (%)</th>
@@ -321,13 +357,94 @@
             </table>
         </div>
 
-        <div class="modal-section" style="margin-top: 30px;">☁️ 5. Google Drive: общий прайс</div>
+        <div class="modal-section" style="margin-top: 30px;">
+            <span>✂️ 5. Доп. работы и расходники</span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+            * <strong>Расходники</strong> — всё, что тратится при доп. работах: скотч, люверсы, ламинат, монтажная плёнка, держатели. Каждый вариант (например, скотч 6 мм, 9 мм, вспененный, силиконовый) — отдельная строка со своей себестоимостью и наличием.
+            <strong>Работы</strong> — сами операции. У работы указывается, для каких групп материалов она доступна, как считается количество и какой вид расходника она использует (вид должен совпадать с колонкой «Вид» у расходников).
+            Всё это входит в Excel-прайс (кнопки экспорта/импорта в разделе 4) на листах «Расходники» и «Работы».
+        </p>
+        <div class="modal-grid" style="margin-bottom: 10px;">
+            <div class="form-group"><label>Скидка на доп. работы для «Опт» (%):</label>
+                <input type="number" step="1" min="0" max="100" id="cfgWorksDiscWholesale" class="form-control" onchange="updateWorksConfig()"></div>
+            <div class="form-group"><label>Скидка на доп. работы для «Дилер» (%):</label>
+                <input type="number" step="1" min="0" max="100" id="cfgWorksDiscDealer" class="form-control" onchange="updateWorksConfig()"></div>
+            <div class="form-group"><label>Коэффициент «средняя сложность» (x):</label>
+                <input type="number" step="0.1" min="0" id="cfgWorksCoefMedium" class="form-control" onchange="updateWorksConfig()"></div>
+            <div class="form-group"><label>Коэффициент «сложная, мелкие элементы» (x):</label>
+                <input type="number" step="0.1" min="0" id="cfgWorksCoefComplex" class="form-control" onchange="updateWorksConfig()"></div>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">* Срочность («24ч» / «день-в-день») удорожает доп. работы так же, как печать. Услуги на весь заказ (дизайнер, допечатная подготовка) не зависят от уровня цен и срочности позиций.</p>
+
+        <div class="modal-section" style="font-size: 14px; margin-top: 10px;">
+            <span>🧻 Расходники</span>
+            <button class="btn btn-primary btn-sm" onclick="addConsumableRow()">➕ Добавить расходник</button>
+        </div>
+        <div style="overflow-x: auto;">
+            <table class="mat-table" style="min-width: 1500px;">
+                <thead>
+                    <tr>
+                        <th style="min-width: 150px;">Вид</th>
+                        <th style="min-width: 230px;">Название</th>
+                        <th style="min-width: 70px;">Ширина, мм</th>
+                        <th style="min-width: 70px;">Толщина, мм</th>
+                        <th style="min-width: 130px;">Состав / примечание</th>
+                        <th style="min-width: 80px;">Формат</th>
+                        <th style="min-width: 70px;">Единица</th>
+                        <th style="min-width: 80px;">Себест. за ед.</th>
+                        <th style="min-width: 70px;">Валюта</th>
+                        <th style="min-width: 70px;">Наценка, %</th>
+                        <th style="min-width: 90px;" title="Только для листового: доплата за подрезку на полосы, грн за единицу расхода">Подрезка листового, грн/ед</th>
+                        <th style="min-width: 60px;">Есть в остатках</th>
+                        <th style="min-width: 50px;" title="Скрытый расходник не предлагается менеджеру, но старые заказы с ним открываются корректно">Скрыт</th>
+                        <th style="min-width: 40px;">Удал.</th>
+                    </tr>
+                </thead>
+                <tbody id="consumablesTableBody"></tbody>
+            </table>
+        </div>
+        <datalist id="consumableKindsList"></datalist>
+
+        <div class="modal-section" style="font-size: 14px; margin-top: 20px;">
+            <span>🛠️ Работы</span>
+            <button class="btn btn-primary btn-sm" onclick="addOperationRow()">➕ Добавить работу</button>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+            Единицы: <strong>м² печати</strong> — считается по площади печати; <strong>за изделие</strong> — по тиражу; <strong>п.м. по периметру</strong> — периметр изделия × тираж (менеджер может поправить);
+            <strong>люверсы по шагу</strong> — количество по периметру и шагу, но не меньше 4 на изделие; <strong>шт/линий на изделие</strong> — например, биги, гибы, держатели;
+            <strong>час</strong> и <strong>за заказ</strong> — услуги на весь заказ (показываются отдельным блоком под позициями).
+            «Параметр» — шаг люверсов в см или количество на изделие по умолчанию. «Расход на ед.» — сколько единиц расходника уходит на единицу работы (например, 1.05 м² ламината на 1 м²).
+        </p>
+        <div style="overflow-x: auto;">
+            <table class="mat-table" style="min-width: 1500px;">
+                <thead>
+                    <tr>
+                        <th style="min-width: 260px;">Название работы</th>
+                        <th style="min-width: 200px;">Для групп материалов</th>
+                        <th style="min-width: 150px;">Единица расчёта</th>
+                        <th style="min-width: 80px;">Цена за ед., грн</th>
+                        <th style="min-width: 80px;">Минимум, грн</th>
+                        <th style="min-width: 80px;" title="Для расчёта прибыли: сколько стоит работа вам (ЗП и т.п.) за единицу">Себест. работы за ед., грн</th>
+                        <th style="min-width: 150px;">Расходник (вид)</th>
+                        <th style="min-width: 70px;">Расход на ед.</th>
+                        <th style="min-width: 60px;">Сложность</th>
+                        <th style="min-width: 70px;">Параметр</th>
+                        <th style="min-width: 50px;">Скрыта</th>
+                        <th style="min-width: 40px;">Удал.</th>
+                    </tr>
+                </thead>
+                <tbody id="operationsTableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="modal-section" style="margin-top: 30px;">☁️ 6. Google Drive: общий прайс</div>
         <div style="margin-bottom: 15px;">
             <span class="cloud-indicator" id="cloudIndicator">☁️ Drive не настроен</span>
         </div>
 
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
-            <strong>Порядок работы с общим прайсом:</strong> 1) нажмите «Обновить прайс», чтобы подтянуть последние цены коллег; 2) внесите правки в разделе 4 выше; 3) нажмите «Опубликовать прайс», чтобы сохранить изменения для всех. Прайс также обновляется автоматически раз в минуту и при возврате на вкладку браузера — но только после того, как вы хотя бы раз обновили его вручную в этом браузере.
+            <strong>Порядок работы с общим прайсом:</strong> 1) нажмите «Обновить прайс», чтобы подтянуть последние цены коллег; 2) внесите правки в разделах 1–5 выше; 3) нажмите «Опубликовать прайс», чтобы сохранить изменения для всех. Прайс также обновляется автоматически раз в минуту и при возврате на вкладку браузера — но только после того, как вы хотя бы раз обновили его вручную в этом браузере.
         </p>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom: 10px;">
             <button class="btn btn-outline" onclick="loadPriceFromDrive()" title="Загрузить актуальный общий прайс">↻ Обновить прайс</button>
@@ -517,7 +634,8 @@ function normalizePosition(raw, index = 0) {
         hasNoStock: Boolean(source.hasNoStock),
         urgency: ['standard', '24h', 'same_day'].includes(source.urgency) ? source.urgency : 'standard',
         discountPercent: Math.min(100, validNumber(source.discountPercent, 0, 0)),
-        discountNote: typeof source.discountNote === 'string' ? source.discountNote : ''
+        discountNote: typeof source.discountNote === 'string' ? source.discountNote : '',
+        works: Array.isArray(source.works) ? source.works.map(normalizePosWork).filter(Boolean) : []
     };
 }
 
@@ -543,12 +661,195 @@ function normalizeMaterial(raw) {
         setupFeeRollOverride: source.setupFeeRollOverride === null || source.setupFeeRollOverride === undefined ? null : validNumber(source.setupFeeRollOverride, null, 0),
         setupFeeSheetOverride: source.setupFeeSheetOverride === null || source.setupFeeSheetOverride === undefined ? null : validNumber(source.setupFeeSheetOverride, null, 0),
         defaultPrimer: Boolean(source.defaultPrimer),
-        recommendedMode: typeof source.recommendedMode === 'string' && source.recommendedMode ? source.recommendedMode : 'MODE_CMYK_STD'
+        recommendedMode: typeof source.recommendedMode === 'string' && source.recommendedMode ? source.recommendedMode : 'MODE_CMYK_STD',
+        // Группа материала определяет, какие доп. работы предлагаются менеджеру.
+        // У старых материалов (до появления доп. работ) группы нет — угадываем её по
+        // названию; администратор потом может поправить в таблице материалов.
+        group: MATERIAL_GROUPS.some(g => g.code === source.group) ? source.group : guessMaterialGroup(source.name)
     };
 }
 
 function normalizeMaterials(materials) {
     return Array.isArray(materials) && materials.length ? materials.map(normalizeMaterial) : null;
+}
+
+// ------------------------------------------------------------------
+// ДОП. РАБОТЫ (ДОПЕЧАТНЫЕ / ПОСТПЕЧАТНЫЕ) И РАСХОДНИКИ — справочники
+// ------------------------------------------------------------------
+// Группы материалов. 'other' — «Другое / давальческое»: для таких материалов
+// менеджеру показываются все работы, потому что заранее неизвестно, что это.
+const MATERIAL_GROUPS = [
+    { code: 'film', label: 'Самоклейка', aliases: ['самоклейка', 'самоклеющаяся', 'самоклеющаяся пленка', 'пленка', 'плёнка'] },
+    { code: 'banner', label: 'Баннер', aliases: ['баннер', 'банер'] },
+    { code: 'poster', label: 'Ситик', aliases: ['ситик', 'постер', 'постерная', 'постерная бумага', 'ситилайт'] },
+    { code: 'paper', label: 'Картон/бумага', aliases: ['картон', 'бумага', 'картон/бумага', 'картон, бумага', 'бумага листовая'] },
+    { code: 'pvc', label: 'ПВХ/ПЕТ', aliases: ['пвх', 'пет', 'пэт', 'пвх/пет', 'pvc', 'pet'] },
+    { code: 'acrylic', label: 'Акрил', aliases: ['акрил', 'оргстекло'] },
+    { code: 'other', label: 'Другое (все работы)', aliases: ['другое', 'давальческое'] }
+];
+const WORK_GROUP_CODES = MATERIAL_GROUPS.filter(g => g.code !== 'other').map(g => g.code);
+
+function getGroupLabel(code) {
+    const group = MATERIAL_GROUPS.find(g => g.code === code);
+    return group ? group.label : code;
+}
+
+function guessMaterialGroup(name) {
+    const n = String(name || '').toLowerCase();
+    if (/давальч/.test(n)) return 'other';
+    if (/акрил|оргстек/.test(n)) return 'acrylic';
+    if (/пвх|pvc|\bпет\b|пэт|\bpet\b|petg/.test(n)) return 'pvc';
+    if (/ба?н+ер|frontlit|blockout|backlit|сетк/.test(n)) return 'banner';
+    if (/ситик|постер|citylight|ситилайт/.test(n)) return 'poster';
+    if (/картон|бумаг/.test(n)) return 'paper';
+    if (/плен|плён|самокл|оракал|oracal|ritrama|vinyl|винил/.test(n)) return 'film';
+    return 'other';
+}
+
+// Разбор списка групп из Excel: «Самоклейка, Баннер», «Все» и т.п.
+function parseGroupsText(text) {
+    const tokens = String(text || '').toLowerCase().split(/[,;\n]+/).map(t => t.trim()).filter(Boolean);
+    if (tokens.some(t => t === 'все' || t === 'всё' || t === 'all')) return [...WORK_GROUP_CODES];
+    const result = [];
+    tokens.forEach(token => {
+        const group = MATERIAL_GROUPS.find(g => g.code !== 'other' && (g.label.toLowerCase() === token || g.aliases.includes(token) || g.code === token));
+        if (group && !result.includes(group.code)) result.push(group.code);
+    });
+    return result;
+}
+
+function groupsToText(groups) {
+    if (!groups || !groups.length) return '';
+    if (WORK_GROUP_CODES.every(code => groups.includes(code))) return 'Все';
+    return groups.map(getGroupLabel).join(', ');
+}
+
+// Единицы расчёта работ. scope 'order' — услуга на весь заказ, а не на позицию.
+const WORK_UNITS = [
+    { code: 'area', label: 'м² печати', short: 'м²', scope: 'position' },
+    { code: 'item', label: 'за изделие', short: 'шт', scope: 'position' },
+    { code: 'perimeter', label: 'п.м. по периметру', short: 'п.м.', scope: 'position' },
+    { code: 'grommet', label: 'люверсы по шагу', short: 'шт', scope: 'position' },
+    { code: 'perItem', label: 'шт/линий на изделие', short: 'шт', scope: 'position' },
+    { code: 'hour', label: 'час (на заказ)', short: 'ч', scope: 'order' },
+    { code: 'fixed', label: 'за заказ', short: 'шт', scope: 'order' }
+];
+
+function getWorkUnit(code) {
+    return WORK_UNITS.find(u => u.code === code) || WORK_UNITS[0];
+}
+
+function parseWorkUnitText(text) {
+    const t = String(text || '').trim().toLowerCase();
+    const exact = WORK_UNITS.find(u => u.label.toLowerCase() === t || u.code.toLowerCase() === t);
+    if (exact) return exact.code;
+    if (/люверс/.test(t)) return 'grommet';
+    if (/периметр|п\.?\s?м/.test(t)) return 'perimeter';
+    if (/м²|м2|кв/.test(t)) return 'area';
+    if (/час/.test(t)) return 'hour';
+    if (/заказ/.test(t)) return 'fixed';
+    if (/лини|на издели/.test(t)) return 'perItem';
+    if (/издели|шт/.test(t)) return 'item';
+    return 'item';
+}
+
+const CONSUMABLE_UNITS = [
+    { code: 'm', label: 'п.м.' },
+    { code: 'pcs', label: 'шт' },
+    { code: 'm2', label: 'м²' }
+];
+
+function getConsumableUnitLabel(code) {
+    const unit = CONSUMABLE_UNITS.find(u => u.code === code);
+    return unit ? unit.label : code;
+}
+
+function parseConsumableUnitText(text) {
+    const t = String(text || '').trim().toLowerCase();
+    if (/м²|м2|кв/.test(t)) return 'm2';
+    if (/шт|pcs/.test(t)) return 'pcs';
+    return 'm';
+}
+
+function parseYesNo(value, fallback = false) {
+    if (value === undefined || value === null || value === '') return fallback;
+    if (typeof value === 'boolean') return value;
+    const t = String(value).trim().toLowerCase();
+    if (['да', 'yes', 'true', '1', '+', 'есть'].includes(t)) return true;
+    if (['нет', 'no', 'false', '0', '-'].includes(t)) return false;
+    return fallback;
+}
+
+function normalizeKind(kind) {
+    return String(kind || '').trim().toLowerCase();
+}
+
+function normalizeConsumable(raw, index = 0) {
+    const s = raw && typeof raw === 'object' ? raw : {};
+    return {
+        id: typeof s.id === 'string' && s.id ? s.id : ('cons_' + Date.now() + '_' + index + Math.floor(Math.random() * 1000)),
+        kind: typeof s.kind === 'string' ? s.kind.trim() : '',
+        name: typeof s.name === 'string' && s.name.trim() ? s.name.trim() : 'Расходник без названия',
+        widthMm: s.widthMm === null || s.widthMm === undefined || s.widthMm === '' ? null : validNumber(s.widthMm, null, 0),
+        thicknessMm: s.thicknessMm === null || s.thicknessMm === undefined || s.thicknessMm === '' ? null : validNumber(s.thicknessMm, null, 0),
+        spec: typeof s.spec === 'string' ? s.spec : '',
+        format: s.format === 'sheet' ? 'sheet' : 'roll',
+        unit: CONSUMABLE_UNITS.some(u => u.code === s.unit) ? s.unit : 'm',
+        cost: validNumber(s.cost, 0, 0),
+        currency: ['UAH', 'USD', 'EUR'].includes(s.currency) ? s.currency : 'UAH',
+        markupPct: validNumber(s.markupPct, 0, 0),
+        prepCostUah: validNumber(s.prepCostUah, 0, 0),
+        inStock: s.inStock === undefined ? true : Boolean(s.inStock),
+        hidden: Boolean(s.hidden)
+    };
+}
+
+function normalizeOperation(raw, index = 0) {
+    const s = raw && typeof raw === 'object' ? raw : {};
+    const unit = WORK_UNITS.some(u => u.code === s.unit) ? s.unit : 'item';
+    return {
+        id: typeof s.id === 'string' && s.id ? s.id : ('op_' + Date.now() + '_' + index + Math.floor(Math.random() * 1000)),
+        name: typeof s.name === 'string' && s.name.trim() ? s.name.trim() : 'Работа без названия',
+        groups: Array.isArray(s.groups) ? s.groups.filter(g => WORK_GROUP_CODES.includes(g)) : [],
+        unit,
+        price: validNumber(s.price, 0, 0),
+        minCharge: validNumber(s.minCharge, 0, 0),
+        laborCost: validNumber(s.laborCost, 0, 0),
+        consumableKind: typeof s.consumableKind === 'string' ? s.consumableKind.trim() : '',
+        consumablePerUnit: validNumber(s.consumablePerUnit, 1, 0),
+        hasComplexity: Boolean(s.hasComplexity),
+        // Шаг люверсов в см (для 'grommet') или количество на изделие по умолчанию (для 'perItem').
+        defaultParam: validNumber(s.defaultParam, unit === 'grommet' ? 30 : 1, 0),
+        hidden: Boolean(s.hidden)
+    };
+}
+
+function normalizeConsumables(list) {
+    return Array.isArray(list) ? list.map(normalizeConsumable) : null;
+}
+
+function normalizeOperations(list) {
+    return Array.isArray(list) ? list.map(normalizeOperation) : null;
+}
+
+// Выбранная в позиции работа. qtyOverride — ручное количество (null = авто);
+// param — шаг люверсов (см) или количество на изделие (null = из справочника).
+function normalizePosWork(raw) {
+    const s = raw && typeof raw === 'object' ? raw : {};
+    if (typeof s.opId !== 'string' || !s.opId) return null;
+    return {
+        opId: s.opId,
+        consumableId: typeof s.consumableId === 'string' ? s.consumableId : '',
+        complexity: ['simple', 'medium', 'complex'].includes(s.complexity) ? s.complexity : 'simple',
+        qtyOverride: s.qtyOverride === null || s.qtyOverride === undefined || s.qtyOverride === '' ? null : validNumber(s.qtyOverride, null, 0),
+        param: s.param === null || s.param === undefined || s.param === '' ? null : validNumber(s.param, null, 0)
+    };
+}
+
+function normalizeOrderWorks(list) {
+    if (!Array.isArray(list)) return [];
+    return list.filter(w => w && typeof w.opId === 'string' && w.opId)
+        .map(w => ({ opId: w.opId, qty: validNumber(w.qty, 1, 0) }));
 }
 
 function setCloudStatus(message, state = '') {
@@ -711,12 +1012,14 @@ async function createDriveJson(name, data) {
 function buildPriceSnapshot() {
     return {
         schema: 'mimaki-price-list',
-        schemaVersion: 2,
+        schemaVersion: 3,
         updatedAt: new Date().toISOString(),
         config: appData.config,
         setupFeeBase: appData.setupFeeBase,
         printModes: appData.printModes,
-        materials: appData.materials
+        materials: appData.materials,
+        consumables: appData.consumables,
+        operations: appData.operations
     };
 }
 
@@ -735,12 +1038,24 @@ function applyPriceSnapshot(snapshot) {
         limits: {
             ...defaultAppData.config.limits,
             ...(savedConfig.limits || {})
+        },
+        worksTierDiscount: {
+            ...defaultAppData.config.worksTierDiscount,
+            ...(savedConfig.worksTierDiscount || {})
+        },
+        worksComplexity: {
+            ...defaultAppData.config.worksComplexity,
+            ...(savedConfig.worksComplexity || {})
         }
     };
     if (Number(savedConfig.exchangeRates?.USD) === 41.5) appData.config.exchangeRates.USD = 45.0;
     if (Number(savedConfig.exchangeRates?.EUR) === 45.2) appData.config.exchangeRates.EUR = 53.0;
     if (!['UAH', 'USD', 'EUR'].includes(appData.config.baseCurrency)) appData.config.baseCurrency = 'UAH';
     appData.materials = normalizeMaterials(snapshot.materials) || appData.materials;
+    // Старые прайсы (до появления доп. работ) не содержат этих справочников —
+    // в этом случае оставляем то, что уже есть в браузере, а не стираем.
+    if (Array.isArray(snapshot.consumables)) appData.consumables = normalizeConsumables(snapshot.consumables);
+    if (Array.isArray(snapshot.operations)) appData.operations = normalizeOperations(snapshot.operations);
     appData.setupFeeBase = {
         ...JSON.parse(JSON.stringify(defaultAppData.setupFeeBase)),
         ...(snapshot.setupFeeBase || {})
@@ -840,16 +1155,20 @@ async function publishPriceToDrive() {
 function buildProjectSnapshot() {
     return {
         schema: 'mimaki-project',
-        schemaVersion: 3,
+        schemaVersion: 4,
         updatedAt: new Date().toISOString(),
         orderName: appData.orderName,
         orderNumber: appData.orderNumber,
         discountNote: appData.discountNote,
         positions: appData.positions,
+        orderWorks: appData.orderWorks,
+        servicesDiscountPercent: appData.servicesDiscountPercent,
         config: appData.config,
         setupFeeBase: appData.setupFeeBase,
         printModes: appData.printModes,
-        materials: appData.materials
+        materials: appData.materials,
+        consumables: appData.consumables,
+        operations: appData.operations
     };
 }
 
@@ -1050,6 +1369,8 @@ async function loadProjectFromDriveById(fileId) {
         }
         if (project.config && Array.isArray(project.materials)) applyPriceSnapshot({ ...project, schema: 'mimaki-price-list' });
         appData.positions = normalizePositions(project.positions);
+        appData.orderWorks = normalizeOrderWorks(project.orderWorks);
+        appData.servicesDiscountPercent = Math.min(100, validNumber(project.servicesDiscountPercent, 0, 0));
         appData.orderName = project.orderName || '';
         appData.orderNumber = project.orderNumber || null;
         appData.discountNote = typeof project.discountNote === 'string' ? project.discountNote : '';
@@ -1174,19 +1495,23 @@ const defaultAppData = {
         operatorSalaryHourUah: 200.00, rentMonthUah: 6000.00, monthlyWorkHours: 160,
         equipmentCostUah: 2600000.00, amortTotalM2: 30000,
         markupRetail: 2.50, markupWholesale: 1.80, markupDealer: 1.40,
-        limits: { maxWidthM: 1.61, maxThicknessMm: 50.8 }
+        limits: { maxWidthM: 1.61, maxThicknessMm: 50.8 },
+        // Доп. работы: скидка для опта/дилера (%) и коэффициенты сложности
+        // (подрезка, выборка и т.п.). Простая сложность — всегда ×1.
+        worksTierDiscount: { wholesale: 0, dealer: 0 },
+        worksComplexity: { medium: 1.5, complex: 2.0 }
     },
     // Базовые значения приладки (не привязаны к режиму печати CMYK/HQ/... — только к рулону/листу).
     // Редактируются в инженерном разделе админки; для отдельных материалов их можно переопределить
     // полями setupFeeRollOverride/setupFeeSheetOverride.
     setupFeeBase: { rollUah: 0.00, sheetUah: 0.00 },
     materials: [
-        { id: 'mat_film_gloss', name: 'Пленка Ritrama Gloss', type: 'roll', price: 45.00, currency: 'UAH', scrapRate: 0.05, baseMarkup: 50, wasteMarkup: 0, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_banner_440', name: 'Баннер Frontlit 440g', type: 'roll', price: 1.85, currency: 'USD', scrapRate: 0.04, baseMarkup: 40, wasteMarkup: 10, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_pvc_3mm', name: 'ПВХ пластик 3 мм', type: 'sheet', price: 6.20, currency: 'EUR', scrapRate: 0.06, baseMarkup: 35, wasteMarkup: 5, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' },
-        { id: 'mat_acrylic_4mm', name: 'Акрил прозрачный 4 мм', type: 'sheet', price: 22.50, currency: 'EUR', scrapRate: 0.10, baseMarkup: 40, wasteMarkup: 15, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: true, recommendedMode: 'MODE_W_CMYK_2PASS' },
-        { id: 'mat_acrylic_braille', name: 'Акрил под Брайль 4 мм', type: 'sheet', price: 22.50, currency: 'EUR', scrapRate: 0.15, baseMarkup: 40, wasteMarkup: 15, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: true, recommendedMode: 'MODE_BRAILLE' },
-        { id: 'mat_client', name: 'Давальческое сырье клиента', type: 'sheet', price: 0.00, currency: 'UAH', scrapRate: 0.15, baseMarkup: 0, wasteMarkup: 0, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD' }
+        { id: 'mat_film_gloss', name: 'Пленка Ritrama Gloss', type: 'roll', price: 45.00, currency: 'UAH', scrapRate: 0.05, baseMarkup: 50, wasteMarkup: 0, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD', group: 'film' },
+        { id: 'mat_banner_440', name: 'Баннер Frontlit 440g', type: 'roll', price: 1.85, currency: 'USD', scrapRate: 0.04, baseMarkup: 40, wasteMarkup: 10, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD', group: 'banner' },
+        { id: 'mat_pvc_3mm', name: 'ПВХ пластик 3 мм', type: 'sheet', price: 6.20, currency: 'EUR', scrapRate: 0.06, baseMarkup: 35, wasteMarkup: 5, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD', group: 'pvc' },
+        { id: 'mat_acrylic_4mm', name: 'Акрил прозрачный 4 мм', type: 'sheet', price: 22.50, currency: 'EUR', scrapRate: 0.10, baseMarkup: 40, wasteMarkup: 15, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: true, recommendedMode: 'MODE_W_CMYK_2PASS', group: 'acrylic' },
+        { id: 'mat_acrylic_braille', name: 'Акрил под Брайль 4 мм', type: 'sheet', price: 22.50, currency: 'EUR', scrapRate: 0.15, baseMarkup: 40, wasteMarkup: 15, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: true, recommendedMode: 'MODE_BRAILLE', group: 'acrylic' },
+        { id: 'mat_client', name: 'Давальческое сырье клиента', type: 'sheet', price: 0.00, currency: 'UAH', scrapRate: 0.15, baseMarkup: 0, wasteMarkup: 0, setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD', group: 'other' }
     ],
     // Заводские (изначально заданные Gemini) режимы печати — эталон для кнопки отката в инженерном
     // разделе. Не редактируются напрямую; appData.printModes — рабочая (редактируемая) копия.
@@ -1199,6 +1524,37 @@ const defaultAppData = {
         MODE_RELIEF_25D: { name: 'Премиум 2.5D / Текстура', speedM2h: 3.5, inkMlM2: 45.0 },
         MODE_BRAILLE: { name: '⠃⠗⠁⠡⠇⠠ Шрифт Брайля (0.5-0.6 мм, 10-12 проходов)', speedM2h: 2.0, inkMlM2: 55.0 }
     },
+    // Стартовый справочник расходников — примеры с нулевыми ценами. Реальные
+    // цены администратор заливает через Excel (листы «Расходники» и «Работы»).
+    consumables: [
+        { id: 'cons_tape_yellow_6', kind: 'Скотч', name: 'Двусторонний, жёлтый лайнер', widthMm: 6, thicknessMm: null, spec: 'тонкий', format: 'roll', unit: 'm', cost: 0, currency: 'UAH', markupPct: 0, prepCostUah: 0, inStock: true, hidden: false },
+        { id: 'cons_tape_yellow_9', kind: 'Скотч', name: 'Двусторонний, жёлтый лайнер', widthMm: 9, thicknessMm: null, spec: 'тонкий', format: 'roll', unit: 'm', cost: 0, currency: 'UAH', markupPct: 0, prepCostUah: 0, inStock: false, hidden: false },
+        { id: 'cons_tape_yellow_12', kind: 'Скотч', name: 'Двусторонний, жёлтый лайнер', widthMm: 12, thicknessMm: null, spec: 'тонкий', format: 'roll', unit: 'm', cost: 0, currency: 'UAH', markupPct: 0, prepCostUah: 0, inStock: true, hidden: false },
+        { id: 'cons_tape_foam_12', kind: 'Скотч', name: 'Вспененный', widthMm: 12, thicknessMm: 1, spec: '', format: 'roll', unit: 'm', cost: 0, currency: 'UAH', markupPct: 0, prepCostUah: 0, inStock: true, hidden: false },
+        { id: 'cons_tape_silicone_12', kind: 'Скотч', name: 'Силиконовый', widthMm: 12, thicknessMm: 1, spec: '', format: 'roll', unit: 'm', cost: 0, currency: 'UAH', markupPct: 0, prepCostUah: 0, inStock: false, hidden: false },
+        { id: 'cons_grommet_10', kind: 'Люверс', name: 'Люверс с кольцом', widthMm: 10, thicknessMm: null, spec: '', format: 'roll', unit: 'pcs', cost: 0, currency: 'UAH', markupPct: 0, prepCostUah: 0, inStock: true, hidden: false },
+        { id: 'cons_lam_gloss', kind: 'Ламинат', name: 'Холодный ламинат, глянец', widthMm: null, thicknessMm: null, spec: '', format: 'roll', unit: 'm2', cost: 0, currency: 'UAH', markupPct: 0, prepCostUah: 0, inStock: true, hidden: false },
+        { id: 'cons_lam_matte', kind: 'Ламинат', name: 'Холодный ламинат, мат', widthMm: null, thicknessMm: null, spec: '', format: 'roll', unit: 'm2', cost: 0, currency: 'UAH', markupPct: 0, prepCostUah: 0, inStock: true, hidden: false },
+        { id: 'cons_transfer', kind: 'Монтажная плёнка', name: 'Монтажная плёнка', widthMm: null, thicknessMm: null, spec: '', format: 'roll', unit: 'm2', cost: 0, currency: 'UAH', markupPct: 0, prepCostUah: 0, inStock: true, hidden: false },
+        { id: 'cons_standoff_19', kind: 'Держатель', name: 'Дистанционный держатель', widthMm: 19, thicknessMm: null, spec: '', format: 'roll', unit: 'pcs', cost: 0, currency: 'UAH', markupPct: 0, prepCostUah: 0, inStock: true, hidden: false }
+    ],
+    operations: [
+        { id: 'op_contour_cut', name: 'Подрезка (плоттерная порезка по контуру)', groups: ['film'], unit: 'area', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: true, defaultParam: 1, hidden: false },
+        { id: 'op_trim', name: 'Порезка до размера', groups: ['film', 'banner', 'poster', 'paper', 'pvc'], unit: 'item', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_weeding', name: 'Выборка лишнего', groups: ['film'], unit: 'area', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: true, defaultParam: 1, hidden: false },
+        { id: 'op_transfer', name: 'Нанесение монтажной плёнки', groups: ['film'], unit: 'area', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Монтажная плёнка', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_lamination', name: 'Ламинация холодная', groups: ['film', 'poster', 'paper'], unit: 'area', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Ламинат', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_grommets', name: 'Установка люверсов', groups: ['banner', 'paper', 'pvc'], unit: 'grommet', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Люверс', consumablePerUnit: 1, hasComplexity: false, defaultParam: 30, hidden: false },
+        { id: 'op_hem', name: 'Проклейка края баннера', groups: ['banner'], unit: 'perimeter', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_tape', name: 'Подклейка скотча', groups: ['banner', 'paper', 'pvc', 'acrylic'], unit: 'perimeter', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Скотч', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_crease', name: 'Биговка', groups: ['paper'], unit: 'perItem', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_precise_cut', name: 'Точная порезка по меткам', groups: ['pvc'], unit: 'item', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_bend', name: 'Сгиб струной', groups: ['pvc', 'acrylic'], unit: 'perItem', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_laser', name: 'Лазерная порезка', groups: ['acrylic'], unit: 'perimeter', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: true, defaultParam: 1, hidden: false },
+        { id: 'op_standoffs', name: 'Комплектование дистанционными держателями', groups: ['acrylic'], unit: 'perItem', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Держатель', consumablePerUnit: 1, hasComplexity: false, defaultParam: 4, hidden: false },
+        { id: 'op_design', name: 'Услуги дизайнера', groups: [], unit: 'hour', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_prepress', name: 'Допечатная подготовка', groups: [], unit: 'fixed', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false }
+    ],
     positions: []
 };
 
@@ -1218,7 +1574,13 @@ const appData = {
     config: JSON.parse(JSON.stringify(defaultAppData.config)),
     setupFeeBase: JSON.parse(JSON.stringify(defaultAppData.setupFeeBase)),
     materials: JSON.parse(JSON.stringify(defaultAppData.materials)),
+    consumables: JSON.parse(JSON.stringify(defaultAppData.consumables)),
+    operations: JSON.parse(JSON.stringify(defaultAppData.operations)),
     positions: [],
+    // Услуги на весь заказ (дизайнер, допечатная подготовка): [{opId, qty}]
+    orderWorks: [],
+    // Скидка на услуги заказа — ставится полем «Скидка на весь проект».
+    servicesDiscountPercent: 0,
     printModes: buildInitialPrintModes(),
     BASE_REFERENCE_SPEED: 17.0
 };
@@ -1249,7 +1611,11 @@ function saveAppData() {
                 setupFeeBase: appData.setupFeeBase,
                 printModes: appData.printModes,
                 materials: appData.materials,
+                consumables: appData.consumables,
+                operations: appData.operations,
                 positions: appData.positions,
+                orderWorks: appData.orderWorks,
+                servicesDiscountPercent: appData.servicesDiscountPercent,
                 isSavedToFile: appData.isSavedToFile // Запоминаем статус сохранения проекта
             }));
             updateSaveIndicatorUI();
@@ -1310,9 +1676,21 @@ function loadAppData() {
             if (p.setupFeeBase) appData.setupFeeBase = { ...JSON.parse(JSON.stringify(defaultAppData.setupFeeBase)), ...p.setupFeeBase };
             if (p.printModes && Object.keys(p.printModes).length) appData.printModes = p.printModes;
             appData.materials = normalizeMaterials(p.materials) || appData.materials;
+            if (Array.isArray(p.consumables)) appData.consumables = normalizeConsumables(p.consumables);
+            if (Array.isArray(p.operations)) appData.operations = normalizeOperations(p.operations);
             if (p.positions) appData.positions = normalizePositions(p.positions);
+            appData.orderWorks = normalizeOrderWorks(p.orderWorks);
+            appData.servicesDiscountPercent = Math.min(100, validNumber(p.servicesDiscountPercent, 0, 0));
         }
     } catch (e) { console.log('Сброс к дефолту'); }
+
+    // Приводим справочники к текущей схеме (в т.ч. стартовые — чтобы у материалов
+    // гарантированно была группа, а у настроек — параметры доп. работ).
+    appData.materials = normalizeMaterials(appData.materials) || normalizeMaterials(defaultAppData.materials);
+    appData.consumables = normalizeConsumables(appData.consumables) || [];
+    appData.operations = normalizeOperations(appData.operations) || [];
+    appData.config.worksTierDiscount = { ...defaultAppData.config.worksTierDiscount, ...(appData.config.worksTierDiscount || {}) };
+    appData.config.worksComplexity = { ...defaultAppData.config.worksComplexity, ...(appData.config.worksComplexity || {}) };
 
     if (migratedFromLegacy) saveAppData(); // сразу фиксируем перенесённые данные в новом хранилище (v13)
 
@@ -1331,6 +1709,157 @@ window.addEventListener('beforeunload', function (e) {
 function toBase(amount, currency) {
     if (!amount) return 0;
     return (amount * (appData.config.exchangeRates[currency] || 1.0)) / (appData.config.exchangeRates[appData.config.baseCurrency] || 1.0);
+}
+
+// ------------------------------------------------------------------
+// РАСЧЁТ ДОП. РАБОТ И УСЛУГ
+// ------------------------------------------------------------------
+function findOperation(opId) {
+    return appData.operations.find(o => o.id === opId) || null;
+}
+
+function findConsumable(consId) {
+    return appData.consumables.find(c => c.id === consId) || null;
+}
+
+// Подходит ли работа к группе материала. Для «Другое / давальческое» доступны
+// все работы позиции — заранее неизвестно, что за материал принёс клиент.
+function isOperationForGroup(op, group) {
+    if (getWorkUnit(op.unit).scope !== 'position') return false;
+    if (group === 'other') return true;
+    return op.groups.includes(group);
+}
+
+// Расходники нужного вида: сначала те, что есть в остатках, потом «под заказ».
+// Скрытые не предлагаются (кроме уже выбранного — чтобы старый заказ не ломался).
+function consumablesOfKind(kind, keepId = '') {
+    const k = normalizeKind(kind);
+    if (!k) return [];
+    return appData.consumables
+        .filter(c => normalizeKind(c.kind) === k && (!c.hidden || c.id === keepId))
+        .sort((a, b) => (b.inStock ? 1 : 0) - (a.inStock ? 1 : 0));
+}
+
+function resolveConsumable(op, work) {
+    if (!op.consumableKind) return null;
+    const chosen = findConsumable(work.consumableId);
+    if (chosen && normalizeKind(chosen.kind) === normalizeKind(op.consumableKind)) return chosen;
+    const list = consumablesOfKind(op.consumableKind);
+    return list[0] || null;
+}
+
+function formatConsumableName(c) {
+    if (!c) return '';
+    const parts = [c.name];
+    if (c.widthMm) parts.push(`${c.widthMm} мм`);
+    if (c.thicknessMm) parts.push(`толщ. ${c.thicknessMm} мм`);
+    if (c.spec) parts.push(c.spec);
+    if (c.format === 'sheet') parts.push('листовой');
+    return parts.join(', ');
+}
+
+function formatQty(value) {
+    const n = Number(value) || 0;
+    return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '');
+}
+
+// Количество по умолчанию — из размеров печати и тиража. Размер печати считаем
+// размером готового изделия (порезка, периметр, люверсы — по нему).
+function computeWorkAutoQty(op, pos, param) {
+    const w = Number(pos.printWidthM) || 0;
+    const h = Number(pos.printHeightM) || 0;
+    const q = Number(pos.quantity) || 0;
+    const perimeterM = 2 * (w + h);
+    switch (op.unit) {
+        case 'area': return w * h * q;
+        case 'item': return q;
+        case 'perimeter': return perimeterM * q;
+        case 'grommet': {
+            const stepCm = param > 0 ? param : 30;
+            const perItem = Math.max(4, Math.ceil(perimeterM * 100 / stepCm));
+            return perItem * q;
+        }
+        case 'perItem': return (param || 0) * q;
+        default: return 1;
+    }
+}
+
+const URGENCY_MULTIPLIERS = { standard: 1, '24h': 1.30, same_day: 1.50 };
+
+function calculateWork(op, work, pos) {
+    const param = work.param !== null && work.param !== undefined ? work.param : op.defaultParam;
+    const autoQty = computeWorkAutoQty(op, pos, param);
+    const qty = work.qtyOverride !== null && work.qtyOverride !== undefined ? work.qtyOverride : autoQty;
+    const cfg = appData.config;
+    let coef = 1;
+    if (op.hasComplexity && work.complexity === 'medium') coef = validNumber(cfg.worksComplexity?.medium, 1.5, 0);
+    if (op.hasComplexity && work.complexity === 'complex') coef = validNumber(cfg.worksComplexity?.complex, 2, 0);
+
+    const cons = resolveConsumable(op, work);
+    const consQty = cons ? qty * op.consumablePerUnit : 0;
+    const consCostUnit = cons ? toBase(cons.cost, cons.currency) : 0;
+    const prepUnit = cons && cons.format === 'sheet' ? toBase(cons.prepCostUah, 'UAH') : 0;
+    const consSellUnit = consCostUnit * (1 + (cons ? cons.markupPct : 0) / 100) + prepUnit;
+
+    const laborSell = qty * toBase(op.price, 'UAH') * coef;
+    let base = laborSell + consQty * consSellUnit;
+    const minCharge = toBase(op.minCharge, 'UAH');
+    const minApplied = qty > 0 && base < minCharge;
+    if (minApplied) base = minCharge;
+    if (qty <= 0) base = 0;
+
+    const tierDiscPct = pos.priceTier === 'wholesale' ? validNumber(cfg.worksTierDiscount?.wholesale, 0, 0)
+        : pos.priceTier === 'dealer' ? validNumber(cfg.worksTierDiscount?.dealer, 0, 0) : 0;
+    const urgencyMult = URGENCY_MULTIPLIERS[pos.urgency] || 1;
+    const total = base * (1 - Math.min(100, tierDiscPct) / 100) * urgencyMult;
+
+    const laborCost = qty * toBase(op.laborCost, 'UAH') * coef;
+    const cost = laborCost + consQty * consCostUnit;
+
+    const warnings = [];
+    if (op.consumableKind && !cons) warnings.push({ level: 'err', text: `В справочнике нет расходников вида «${op.consumableKind}» — считается только работа. Добавьте расходник в админке.` });
+    if (cons && !cons.inStock) warnings.push({ level: 'warn', text: `«${formatConsumableName(cons)}» — нет в остатках, под заказ. Уточните срок поставки.` });
+    if (qty > 0 && total <= 0) warnings.push({ level: 'err', text: 'Цена этой работы не задана в админке (0 грн).' });
+
+    return { op, work, param, autoQty, qty, coef, cons, consQty, total, cost, laborCost, minApplied, tierDiscPct, urgencyMult, warnings, unitShort: getWorkUnit(op.unit).short };
+}
+
+function calculatePositionWorks(pos, mat) {
+    const lines = [];
+    (pos.works || []).forEach(work => {
+        const op = findOperation(work.opId);
+        if (!op || !isOperationForGroup(op, mat.group)) return;
+        lines.push(calculateWork(op, work, pos));
+    });
+    return {
+        lines,
+        total: lines.reduce((s, l) => s + l.total, 0),
+        cost: lines.reduce((s, l) => s + l.cost, 0),
+        laborCost: lines.reduce((s, l) => s + l.laborCost, 0)
+    };
+}
+
+// Услуги на весь заказ: не округляются до 50 и не зависят от уровня цен/срочности
+// позиций; скидка — та, что задана полем «Скидка на весь проект».
+function calculateOrderServices() {
+    const lines = [];
+    (appData.orderWorks || []).forEach(work => {
+        const op = findOperation(work.opId);
+        if (!op || getWorkUnit(op.unit).scope !== 'order') return;
+        const qty = validNumber(work.qty, 1, 0);
+        let total = qty * toBase(op.price, 'UAH');
+        const minCharge = toBase(op.minCharge, 'UAH');
+        const minApplied = qty > 0 && total < minCharge;
+        if (minApplied) total = minCharge;
+        if (qty <= 0) total = 0;
+        const warnings = [];
+        if (qty > 0 && total <= 0) warnings.push({ level: 'err', text: 'Цена этой услуги не задана в админке (0 грн).' });
+        lines.push({ op, work, qty, total, minApplied, cost: qty * toBase(op.laborCost, 'UAH'), warnings, unitShort: getWorkUnit(op.unit).short });
+    });
+    const total = lines.reduce((s, l) => s + l.total, 0);
+    const discountPercent = Math.min(100, Math.max(0, validNumber(appData.servicesDiscountPercent, 0, 0)));
+    const discountAmount = total * discountPercent / 100;
+    return { lines, total, discountPercent, discountAmount, finalTotal: total - discountAmount, cost: lines.reduce((s, l) => s + l.cost, 0) };
 }
 
 function calculatePositionValues(pos) {
@@ -1416,7 +1945,11 @@ function calculatePositionValues(pos) {
 
     const printTotal = (printSellM2 * printAreaM2) + effSetupFee;
     const matTotal = (matSellM2 * matChargedAreaM2) + wasteCostTotal;
-    const exactGrandTotal = printTotal + matTotal;
+    // Доп. работы входят в сумму позиции ДО округления до 50 грн, и скидка по
+    // позиции действует на них так же, как на печать.
+    const works = calculatePositionWorks(pos, mat);
+    const worksTotal = works.total;
+    const exactGrandTotal = printTotal + matTotal + worksTotal;
     
     const posGrandTotal = Math.ceil(exactGrandTotal / 50) * 50;
     const unitPrice = pos.quantity > 0 ? posGrandTotal / pos.quantity : 0;
@@ -1438,13 +1971,17 @@ function calculatePositionValues(pos) {
     // без каких-либо наценок (наценки — это выручка, а не затраты).
     const totalMatCost = matBase * matAreaM2;
     
-    const totalFullCost = totalInkElec + totalAmort + totalSalaryRent + totalPrimer + totalScrap + totalMatCost;
+    // Себестоимость доп. работ: расходники по закупочной цене + себестоимость труда.
+    const totalWorksCost = works.cost;
+    const totalFullCost = totalInkElec + totalAmort + totalSalaryRent + totalPrimer + totalScrap + totalMatCost + totalWorksCost;
     const totalProfit = posGrandTotal - totalFullCost;
     const profitPct = posGrandTotal > 0 ? (totalProfit / posGrandTotal) * 100 : 0;
     const profitM2 = printAreaM2 > 0 ? totalProfit / printAreaM2 : 0;
 
     const scrapFixedPartM2 = (amortM2 + salaryM2 + rentM2) * pos.customScrapRate;
-    const totalFixedCosts = totalAmort + totalSalaryRent + (scrapFixedPartM2 * printAreaM2);
+    // Труд на доп. работах — это та же зарплата, поэтому в «валовую наценку»
+    // (без ЗП/аренды/амортизации) он возвращается так же, как ЗП оператора.
+    const totalFixedCosts = totalAmort + totalSalaryRent + (scrapFixedPartM2 * printAreaM2) + works.laborCost;
     const totalMarkup = totalProfit + totalFixedCosts; 
     const markupPct = posGrandTotal > 0 ? (totalMarkup / posGrandTotal) * 100 : 0;
     const markupM2 = printAreaM2 > 0 ? totalMarkup / printAreaM2 : 0;
@@ -1458,7 +1995,7 @@ function calculatePositionValues(pos) {
         mat, mode, printAreaM2, matAreaM2,
         calcTimeH, effTimeH, directOpCostM2, amortM2, salaryM2, rentM2, scrapCostM2, primerM2, fullCostPriceM2,
         matSellM2, matChargedAreaM2, wasteAreaM2, wasteSellM2, wasteCostTotal,
-        printSellM2, calcSetupFee, effSetupFee, printTotal, matTotal, exactGrandTotal, posGrandTotal, unitPrice,
+        printSellM2, calcSetupFee, effSetupFee, printTotal, matTotal, worksLines: works.lines, worksTotal, totalWorksCost, exactGrandTotal, posGrandTotal, unitPrice,
         discountPercent, discountAmount, finalTotal, finalUnitPrice,
         totalProfit, profitPct, profitM2, totalMarkup, markupPct, markupM2,
         warnings
@@ -1480,6 +2017,8 @@ function startNewOrder() {
     // Проверка 2: Подтверждение очистки экрана
     if (confirm('Вы уверены, что хотите очистить экран и начать новый заказ?')) {
         appData.positions = [];
+        appData.orderWorks = [];
+        appData.servicesDiscountPercent = 0;
         appData.orderName = '';
         appData.orderNumber = null;
         appData.discountNote = '';
@@ -1501,7 +2040,9 @@ function exportProject() {
         orderName: appData.orderName,
         orderNumber: appData.orderNumber,
         discountNote: appData.discountNote,
-        positions: appData.positions
+        positions: appData.positions,
+        orderWorks: appData.orderWorks,
+        servicesDiscountPercent: appData.servicesDiscountPercent
     };
     const dataStr = JSON.stringify(projectData, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
@@ -1525,6 +2066,8 @@ function importProject(event) {
             const importedData = JSON.parse(e.target.result);
             if (importedData.positions && Array.isArray(importedData.positions)) {
                 appData.positions = normalizePositions(importedData.positions);
+                appData.orderWorks = normalizeOrderWorks(importedData.orderWorks);
+                appData.servicesDiscountPercent = Math.min(100, validNumber(importedData.servicesDiscountPercent, 0, 0));
                 appData.orderName = importedData.orderName || '';
                 appData.orderNumber = importedData.orderNumber || null;
                 appData.discountNote = typeof importedData.discountNote === 'string' ? importedData.discountNote : '';
@@ -1566,7 +2109,8 @@ function addPosition(isUserAction = true) {
         customScrapRate: defMat.scrapRate, priceTier: 'retail',
         manualTimeH: null, manualSetupFee: null,
         isMediumFormat: false, hasNoStock: false, urgency: 'standard',
-        discountPercent: 0, discountNote: ''
+        discountPercent: 0, discountNote: '',
+        works: []
     });
     
     if (isUserAction) appData.isSavedToFile = false;
@@ -1625,6 +2169,12 @@ function onMaterialChange(posId, materialId) {
     if (pos && mat) {
         pos.materialId = mat.id; pos.effType = mat.type; pos.modeCode = mat.recommendedMode;
         pos.usePrimer = mat.defaultPrimer; pos.customScrapRate = mat.scrapRate;
+        // Доп. работы, которые не подходят к новому материалу, убираем, чтобы в
+        // смету не попала, например, «установка люверсов» для акрила.
+        pos.works = (pos.works || []).filter(w => {
+            const op = findOperation(w.opId);
+            return op && isOperationForGroup(op, mat.group);
+        });
         
         appData.isSavedToFile = false;
         renderPositions(); saveAppData();
@@ -1640,7 +2190,7 @@ function renderPositions() {
     const container = document.getElementById('positionsContainer');
     container.innerHTML = '';
 
-    let totalAreaAll = 0, totalTimeAll = 0, totalPrintSellAll = 0, totalMatSellAll = 0, grandTotalAll = 0, totalDiscountAmountAll = 0, finalGrandTotalAll = 0;
+    let totalAreaAll = 0, totalTimeAll = 0, totalPrintSellAll = 0, totalMatSellAll = 0, grandTotalAll = 0, totalDiscountAmountAll = 0, finalGrandTotalAll = 0, totalWorksAll = 0;
 
     appData.positions.forEach((pos, index) => {
         const calc = calculatePositionValues(pos);
@@ -1654,6 +2204,7 @@ function renderPositions() {
         totalTimeAll += calc.effTimeH;
         totalPrintSellAll += calc.printTotal;
         totalMatSellAll += calc.matTotal;
+        totalWorksAll += calc.worksTotal;
         grandTotalAll += calc.posGrandTotal;
         totalDiscountAmountAll += calc.discountAmount;
         finalGrandTotalAll += calc.finalTotal;
@@ -1764,6 +2315,8 @@ function renderPositions() {
                 </div>
             </div>
 
+            ${renderWorksBlock(pos, calc)}
+
             <div class="grid" style="margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 12px;">
                 <div class="form-group">
                     <label>Скидка на позицию (%):</label>
@@ -1778,6 +2331,7 @@ function renderPositions() {
             <div class="pos-financials">
                 <div>
                     <strong>Мат-л заготовки:</strong> ${calc.matAreaM2.toFixed(2)} м² | <strong>Площадь печати:</strong> ${calc.printAreaM2.toFixed(2)} м² <br>
+                    ${calc.worksTotal > 0 ? `<strong>Печать + материал:</strong> ${(calc.printTotal + calc.matTotal).toFixed(2)} · <strong>Доп. работы:</strong> ${calc.worksTotal.toFixed(2)} ${appData.config.baseCurrency}<br>` : ''}
                     <strong>Цена за 1 шт:</strong> ${calc.finalUnitPrice.toFixed(2)} ${appData.config.baseCurrency}
                 </div>
                 <div class="pos-price">
@@ -1796,6 +2350,7 @@ function renderPositions() {
                 • <strong>Коммерческий тариф печати клиенту:</strong> ${calc.printSellM2.toFixed(2)} /м²<br>
                 • <strong>Продажа материала под печатью:</strong> ${calc.matSellM2.toFixed(2)} /м² × ${calc.matChargedAreaM2.toFixed(2)} м²<br>
                 ${calc.wasteAreaM2 > 0 ? `• <strong>Материал вне области печати (перерасход):</strong> ${calc.wasteSellM2.toFixed(2)} /м² × ${calc.wasteAreaM2.toFixed(2)} м² = ${calc.wasteCostTotal.toFixed(2)} ${appData.config.baseCurrency}<br>` : ''}
+                ${calc.worksLines.map(l => `• <strong>Доп. работа «${escapeHtml(l.op.name)}»:</strong> ${formatQty(l.qty)} ${l.unitShort}${l.coef !== 1 ? ` × сложность ${l.coef}` : ''}${l.cons ? ` · расходник «${escapeHtml(formatConsumableName(l.cons))}» ${formatQty(l.consQty)} ${getConsumableUnitLabel(l.cons.unit)}` : ''}${l.minApplied ? ' · применён минимум' : ''}${l.tierDiscPct > 0 ? ` · скидка уровня ${l.tierDiscPct}%` : ''}${l.urgencyMult > 1 ? ` · срочность ×${l.urgencyMult}` : ''} = ${l.total.toFixed(2)} ${appData.config.baseCurrency} (себест. ${l.cost.toFixed(2)})<br>`).join('')}
                 
                 <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border);">
                     • <strong>ВАЛОВАЯ НАЦЕНКА (без учета ЗП, Аренды и Амортизации):</strong><br>
@@ -1819,6 +2374,15 @@ function renderPositions() {
     document.getElementById('totalOrderArea').innerText = totalAreaAll.toFixed(2) + ' м²';
     document.getElementById('totalOrderTime').innerText = totalTimeAll.toFixed(2) + ' ч';
     document.getElementById('totalPrintMatSplit').innerText = `${totalPrintSellAll.toFixed(0)} / ${totalMatSellAll.toFixed(0)} ${appData.config.baseCurrency}`;
+
+    // Услуги на весь заказ добавляются к итогу отдельно (без округления до 50).
+    const services = calculateOrderServices();
+    renderOrderServices(services);
+    grandTotalAll += services.total;
+    totalDiscountAmountAll += services.discountAmount;
+    finalGrandTotalAll += services.finalTotal;
+    totalWorksAll += services.total;
+    document.getElementById('totalWorksSum').innerText = `${totalWorksAll.toFixed(0)} ${appData.config.baseCurrency}`;
 
     // Скидка внизу — двусторонняя: если скидки заданы по отдельным позициям (даже
     // разные), здесь показывается ФАКТИЧЕСКАЯ средневзвешенная скидка по всему
@@ -1845,12 +2409,180 @@ function renderPositions() {
     document.getElementById('grandTotalDisplay').innerText = finalGrandTotalAll.toFixed(2) + ' ' + appData.config.baseCurrency;
 }
 
+// ------------------------------------------------------------------
+// ДОП. РАБОТЫ В КАРТОЧКЕ ПОЗИЦИИ И УСЛУГИ НА ВЕСЬ ЗАКАЗ (UI)
+// ------------------------------------------------------------------
+// Строка для передачи в обработчик onclick/onchange внутри HTML-атрибута.
+function jsArg(value) {
+    return escapeHtml(JSON.stringify(String(value)));
+}
+
+// Раскрыт ли блок «Доп. работы» у позиции. Если менеджер сам его не
+// открывал/закрывал — раскрыт, когда в позиции уже выбраны работы.
+const worksBlockOpenState = {};
+
+function onWorksBlockToggle(posId, el) {
+    worksBlockOpenState[posId] = el.open;
+}
+
+function renderWorksBlock(pos, calc) {
+    const group = calc.mat.group;
+    const selectedIds = new Set((pos.works || []).map(w => w.opId));
+    const ops = appData.operations.filter(op => isOperationForGroup(op, group) && (!op.hidden || selectedIds.has(op.id)));
+    const cur = appData.config.baseCurrency;
+    const count = calc.worksLines.length;
+    const isOpen = worksBlockOpenState[pos.id] !== undefined ? worksBlockOpenState[pos.id] : count > 0;
+    const summaryRight = count > 0
+        ? `${count} ${count === 1 ? 'работа' : (count < 5 ? 'работы' : 'работ')} · ${calc.worksTotal.toFixed(2)} ${cur}`
+        : 'не выбраны';
+
+    let body = '';
+    if (!ops.length) {
+        body = `<div style="font-size:13px; color:var(--text-muted); padding: 6px 0;">Для группы «${escapeHtml(getGroupLabel(group))}» доп. работы не заданы. Их можно добавить в админке (раздел 5) или поменять группу материала (раздел 4).</div>`;
+    } else {
+        body = ops.map(op => renderWorkRow(pos, op, calc.worksLines.find(l => l.op.id === op.id))).join('');
+    }
+
+    return `
+        <details class="works-block" ${isOpen ? 'open' : ''} ontoggle="onWorksBlockToggle(${pos.id}, this)">
+            <summary><span>✂️ Доп. работы <span style="font-weight:400; color: var(--text-muted); font-size: 12px;">(группа материала: ${escapeHtml(getGroupLabel(group))})</span></span><span class="works-summary-sum">${summaryRight}</span></summary>
+            <div class="works-list">${body}</div>
+        </details>`;
+}
+
+function renderWorkRow(pos, op, line) {
+    const unit = getWorkUnit(op.unit);
+    const cur = appData.config.baseCurrency;
+    const opArg = jsArg(op.id);
+    if (!line) {
+        return `
+            <div class="work-row">
+                <label class="work-name"><input type="checkbox" onchange="toggleWork(${pos.id}, ${opArg}, this.checked)"> ${escapeHtml(op.name)} <span class="work-unit-hint">(${escapeHtml(unit.label)})</span></label>
+            </div>`;
+    }
+    const work = line.work;
+    const params = [];
+
+    if (op.consumableKind) {
+        const list = consumablesOfKind(op.consumableKind, line.cons ? line.cons.id : '');
+        if (list.length) {
+            const options = list.map(c => `<option value="${escapeHtml(c.id)}" ${line.cons && line.cons.id === c.id ? 'selected' : ''}>${escapeHtml(formatConsumableName(c))}${c.inStock ? '' : ' — нет в остатках'}${c.hidden ? ' (скрыт)' : ''}</option>`).join('');
+            params.push(`<label>${escapeHtml(op.consumableKind)}: <select onchange="updateWorkField(${pos.id}, ${opArg}, 'consumableId', this.value)">${options}</select></label>`);
+        }
+    }
+    if (op.hasComplexity) {
+        params.push(`<label>Сложность: <select onchange="updateWorkField(${pos.id}, ${opArg}, 'complexity', this.value)">
+            <option value="simple" ${work.complexity === 'simple' ? 'selected' : ''}>Простая</option>
+            <option value="medium" ${work.complexity === 'medium' ? 'selected' : ''}>Средняя (×${appData.config.worksComplexity.medium})</option>
+            <option value="complex" ${work.complexity === 'complex' ? 'selected' : ''}>Сложная, мелкие элементы (×${appData.config.worksComplexity.complex})</option>
+        </select></label>`);
+    }
+    if (op.unit === 'grommet') {
+        params.push(`<label>Шаг, см: <input type="number" min="1" step="1" value="${formatQty(line.param)}" onchange="updateWorkField(${pos.id}, ${opArg}, 'param', this.value === '' ? null : Math.max(1, Number(this.value)))"></label>`);
+    }
+    if (op.unit === 'perItem') {
+        params.push(`<label>На 1 изделие: <input type="number" min="0" step="1" value="${formatQty(line.param)}" onchange="updateWorkField(${pos.id}, ${opArg}, 'param', this.value === '' ? null : Math.max(0, Number(this.value)))"></label>`);
+    }
+    const isManual = work.qtyOverride !== null && work.qtyOverride !== undefined;
+    params.push(`<label>Кол-во, ${escapeHtml(unit.short)}: <input type="number" min="0" step="0.01" class="${isManual ? 'highlight-input' : ''}" value="${formatQty(line.qty)}" title="Авто: ${formatQty(line.autoQty)} ${escapeHtml(unit.short)}. Введите своё число, если нужно." onchange="updateWorkField(${pos.id}, ${opArg}, 'qtyOverride', this.value === '' ? null : Math.max(0, Number(this.value)))">${isManual ? `<button type="button" class="btn btn-outline btn-sm" style="padding:1px 6px; font-size:11px;" onclick="updateWorkField(${pos.id}, ${opArg}, 'qtyOverride', null)" title="Вернуть авторасчёт (${formatQty(line.autoQty)})">↺ Авто</button>` : ''}</label>`);
+
+    const extras = [];
+    if (line.minApplied) extras.push('минимум');
+    if (line.tierDiscPct > 0) extras.push(`−${line.tierDiscPct}%`);
+    if (line.urgencyMult > 1) extras.push(`срочн. ×${line.urgencyMult}`);
+    const notes = line.warnings.map(w => `<div class="work-note ${w.level}">⚠️ ${escapeHtml(w.text)}</div>`).join('');
+
+    return `
+        <div class="work-row active">
+            <label class="work-name"><input type="checkbox" checked onchange="toggleWork(${pos.id}, ${opArg}, this.checked)"> <strong>${escapeHtml(op.name)}</strong></label>
+            <div class="work-params">${params.join('')}</div>
+            <div class="work-sum">${line.total.toFixed(2)} ${cur}${extras.length ? `<br><small style="font-weight:400; color: var(--text-muted);">${extras.join(' · ')}</small>` : ''}</div>
+            ${notes}
+        </div>`;
+}
+
+function toggleWork(posId, opId, checked) {
+    const pos = appData.positions.find(p => p.id === posId);
+    const op = findOperation(opId);
+    if (!pos || !op) return;
+    pos.works = (pos.works || []).filter(w => w.opId !== opId);
+    if (checked) {
+        // Сразу подставляем расходник, который есть в остатках (если он нужен).
+        const firstCons = op.consumableKind ? consumablesOfKind(op.consumableKind)[0] : null;
+        pos.works.push({ opId, consumableId: firstCons ? firstCons.id : '', complexity: 'simple', qtyOverride: null, param: null });
+        worksBlockOpenState[posId] = true;
+    }
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+
+function updateWorkField(posId, opId, field, value) {
+    const pos = appData.positions.find(p => p.id === posId);
+    if (!pos) return;
+    const work = (pos.works || []).find(w => w.opId === opId);
+    if (!work) return;
+    if ((field === 'qtyOverride' || field === 'param') && value !== null && !Number.isFinite(value)) return;
+    work[field] = value;
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+
+function renderOrderServices(services) {
+    const card = document.getElementById('orderServicesCard');
+    const list = document.getElementById('orderServicesList');
+    if (!card || !list) return;
+    const selectedIds = new Set((appData.orderWorks || []).map(w => w.opId));
+    const ops = appData.operations.filter(op => getWorkUnit(op.unit).scope === 'order' && (!op.hidden || selectedIds.has(op.id)));
+    if (!ops.length) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    const cur = appData.config.baseCurrency;
+    let html = '<div class="works-list" style="padding: 0;">';
+    ops.forEach(op => {
+        const unit = getWorkUnit(op.unit);
+        const opArg = jsArg(op.id);
+        const line = services.lines.find(l => l.op.id === op.id);
+        if (!line) {
+            html += `<div class="work-row"><label class="work-name"><input type="checkbox" onchange="toggleOrderService(${opArg}, this.checked)"> ${escapeHtml(op.name)} <span class="work-unit-hint">(${escapeHtml(unit.label)})</span></label></div>`;
+            return;
+        }
+        const qtyLabel = op.unit === 'hour' ? 'Часов' : 'Кол-во';
+        html += `
+            <div class="work-row active">
+                <label class="work-name"><input type="checkbox" checked onchange="toggleOrderService(${opArg}, this.checked)"> <strong>${escapeHtml(op.name)}</strong></label>
+                <div class="work-params"><label>${qtyLabel}: <input type="number" min="0" step="${op.unit === 'hour' ? '0.25' : '1'}" value="${formatQty(line.qty)}" onchange="updateOrderServiceQty(${opArg}, Number(this.value))"></label></div>
+                <div class="work-sum">${line.total.toFixed(2)} ${cur}${line.minApplied ? '<br><small style="font-weight:400; color: var(--text-muted);">минимум</small>' : ''}</div>
+                ${line.warnings.map(w => `<div class="work-note ${w.level}">⚠️ ${escapeHtml(w.text)}</div>`).join('')}
+            </div>`;
+    });
+    html += '</div>';
+    if (services.lines.length) {
+        html += `<div style="text-align:right; font-size: 13px; margin-top: 8px; color: var(--text-muted);">Итого услуги: <strong style="color: var(--text);">${services.finalTotal.toFixed(2)} ${cur}</strong>${services.discountPercent > 0 ? ` (скидка проекта ${services.discountPercent}%: −${services.discountAmount.toFixed(2)})` : ''}</div>`;
+    }
+    list.innerHTML = html;
+}
+
+function toggleOrderService(opId, checked) {
+    appData.orderWorks = (appData.orderWorks || []).filter(w => w.opId !== opId);
+    if (checked) appData.orderWorks.push({ opId, qty: 1 });
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+
+function updateOrderServiceQty(opId, qty) {
+    const work = (appData.orderWorks || []).find(w => w.opId === opId);
+    if (!work || !Number.isFinite(qty)) return;
+    work.qty = Math.max(0, qty);
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+
 // Ввод скидки внизу (для всего проекта сразу) применяет один и тот же % ко ВСЕМ
 // позициям — при равном проценте распределение автоматически пропорционально
 // сумме каждой позиции, отдельно ничего пересчитывать не нужно.
 function applyProjectDiscount(value) {
     const pct = Math.min(100, Math.max(0, Number(value) || 0));
     appData.positions.forEach(p => { p.discountPercent = pct; });
+    appData.servicesDiscountPercent = pct;
     appData.isSavedToFile = false;
     renderPositions();
     saveAppData();
@@ -1896,6 +2628,9 @@ function reallyOpenAdminModal() {
     document.getElementById('setupFeeSheetFactory').textContent = defaultAppData.setupFeeBase.sheetUah + ' грн';
     renderEngineeringSection();
     renderMaterialsTable();
+    fillWorksConfigInputs();
+    renderConsumablesTable();
+    renderOperationsTable();
     document.getElementById('adminModal').style.display = 'flex';
 }
 
@@ -1937,6 +2672,11 @@ function renderMaterialsTable() {
         tr.innerHTML = `
             <td><input type="text" value="${escapeHtml(mat.name)}" onchange="appData.materials[${idx}].name=this.value; appData.isSavedToFile=false; saveAppData()"></td>
             <td>
+                <select onchange="appData.materials[${idx}].group=this.value; appData.isSavedToFile=false; renderPositions(); saveAppData()">
+                    ${MATERIAL_GROUPS.map(g => `<option value="${g.code}" ${mat.group === g.code ? 'selected' : ''}>${escapeHtml(g.label)}</option>`).join('')}
+                </select>
+            </td>
+            <td>
                 <select onchange="appData.materials[${idx}].type=this.value; appData.isSavedToFile=false; saveAppData()">
                     <option value="sheet" ${mat.type === 'sheet' ? 'selected' : ''}>Лист</option>
                     <option value="roll" ${mat.type === 'roll' ? 'selected' : ''}>Рулон</option>
@@ -1966,11 +2706,159 @@ function addNewMaterialRow() {
     appData.materials.push({
         id: 'mat_' + Date.now(), name: 'Новый материал', type: 'sheet',
         price: 0, currency: appData.config.baseCurrency, scrapRate: 0.05, baseMarkup: 30, wasteMarkup: 0,
-        setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD'
+        setupFeeRollOverride: null, setupFeeSheetOverride: null, defaultPrimer: false, recommendedMode: 'MODE_CMYK_STD',
+        group: 'other'
     });
     appData.isSavedToFile = false;
     markPriceChanged();
     renderMaterialsTable(); saveAppData();
+}
+
+// ------------------------------------------------------------------
+// АДМИНКА: ДОП. РАБОТЫ И РАСХОДНИКИ
+// ------------------------------------------------------------------
+function fillWorksConfigInputs() {
+    const c = appData.config;
+    document.getElementById('cfgWorksDiscWholesale').value = c.worksTierDiscount.wholesale;
+    document.getElementById('cfgWorksDiscDealer').value = c.worksTierDiscount.dealer;
+    document.getElementById('cfgWorksCoefMedium').value = c.worksComplexity.medium;
+    document.getElementById('cfgWorksCoefComplex').value = c.worksComplexity.complex;
+}
+
+function updateWorksConfig() {
+    const c = appData.config;
+    c.worksTierDiscount.wholesale = Math.min(100, validNumber(document.getElementById('cfgWorksDiscWholesale').value, c.worksTierDiscount.wholesale, 0));
+    c.worksTierDiscount.dealer = Math.min(100, validNumber(document.getElementById('cfgWorksDiscDealer').value, c.worksTierDiscount.dealer, 0));
+    c.worksComplexity.medium = validNumber(document.getElementById('cfgWorksCoefMedium').value, c.worksComplexity.medium, 0);
+    c.worksComplexity.complex = validNumber(document.getElementById('cfgWorksCoefComplex').value, c.worksComplexity.complex, 0);
+    appData.isSavedToFile = false;
+    markPriceChanged();
+    renderPositions(); saveAppData();
+}
+
+// Любая правка справочника: отметить прайс как изменённый и пересчитать позиции.
+function onWorksCatalogChanged(rerenderAdmin = false) {
+    appData.isSavedToFile = false;
+    markPriceChanged();
+    if (rerenderAdmin) { renderConsumablesTable(); renderOperationsTable(); }
+    renderPositions(); saveAppData();
+}
+
+function setConsumableField(idx, field, value) {
+    const c = appData.consumables[idx];
+    if (!c) return;
+    c[field] = value;
+    onWorksCatalogChanged(['kind', 'format', 'hidden'].includes(field));
+}
+
+function renderConsumablesTable() {
+    const tbody = document.getElementById('consumablesTableBody');
+    if (!tbody) return;
+    const kinds = [...new Set([...appData.consumables.map(c => c.kind), ...appData.operations.map(o => o.consumableKind)].filter(Boolean))];
+    document.getElementById('consumableKindsList').innerHTML = kinds.map(k => `<option value="${escapeHtml(k)}"></option>`).join('');
+    const numOrEmpty = v => v === null || v === undefined ? '' : v;
+    tbody.innerHTML = appData.consumables.map((c, idx) => `
+        <tr style="${c.hidden ? 'opacity:0.55;' : ''}">
+            <td><input type="text" list="consumableKindsList" value="${escapeHtml(c.kind)}" onchange="setConsumableField(${idx}, 'kind', this.value.trim())"></td>
+            <td><input type="text" value="${escapeHtml(c.name)}" onchange="setConsumableField(${idx}, 'name', this.value.trim() || 'Расходник без названия')"></td>
+            <td><input type="number" step="0.1" min="0" value="${numOrEmpty(c.widthMm)}" onchange="setConsumableField(${idx}, 'widthMm', this.value === '' ? null : Math.max(0, Number(this.value)))"></td>
+            <td><input type="number" step="0.1" min="0" value="${numOrEmpty(c.thicknessMm)}" onchange="setConsumableField(${idx}, 'thicknessMm', this.value === '' ? null : Math.max(0, Number(this.value)))"></td>
+            <td><input type="text" value="${escapeHtml(c.spec)}" placeholder="напр. акриловый клей" onchange="setConsumableField(${idx}, 'spec', this.value)"></td>
+            <td><select onchange="setConsumableField(${idx}, 'format', this.value)">
+                <option value="roll" ${c.format === 'roll' ? 'selected' : ''}>Рулон</option>
+                <option value="sheet" ${c.format === 'sheet' ? 'selected' : ''}>Лист</option>
+            </select></td>
+            <td><select onchange="setConsumableField(${idx}, 'unit', this.value)">
+                ${CONSUMABLE_UNITS.map(u => `<option value="${u.code}" ${c.unit === u.code ? 'selected' : ''}>${u.label}</option>`).join('')}
+            </select></td>
+            <td><input type="number" step="0.01" min="0" value="${c.cost}" onchange="setConsumableField(${idx}, 'cost', Math.max(0, Number(this.value) || 0))"></td>
+            <td><select onchange="setConsumableField(${idx}, 'currency', this.value)">
+                ${['UAH', 'USD', 'EUR'].map(cur => `<option value="${cur}" ${c.currency === cur ? 'selected' : ''}>${cur}</option>`).join('')}
+            </select></td>
+            <td><input type="number" step="1" min="0" value="${c.markupPct}" onchange="setConsumableField(${idx}, 'markupPct', Math.max(0, Number(this.value) || 0))"></td>
+            <td><input type="number" step="0.01" min="0" value="${c.prepCostUah}" ${c.format === 'sheet' ? '' : 'disabled title="Только для листового формата"'} onchange="setConsumableField(${idx}, 'prepCostUah', Math.max(0, Number(this.value) || 0))"></td>
+            <td style="text-align:center;"><input type="checkbox" ${c.inStock ? 'checked' : ''} onchange="setConsumableField(${idx}, 'inStock', this.checked)"></td>
+            <td style="text-align:center;"><input type="checkbox" ${c.hidden ? 'checked' : ''} onchange="setConsumableField(${idx}, 'hidden', this.checked)"></td>
+            <td><button class="btn btn-danger btn-sm" onclick="removeConsumableRow(${idx})">🗑</button></td>
+        </tr>`).join('');
+}
+
+function addConsumableRow() {
+    appData.consumables.push(normalizeConsumable({ kind: 'Скотч', name: 'Новый расходник', unit: 'm', inStock: true }));
+    onWorksCatalogChanged(true);
+}
+
+function removeConsumableRow(idx) {
+    const c = appData.consumables[idx];
+    if (!c) return;
+    const inUse = appData.positions.some(p => (p.works || []).some(w => w.consumableId === c.id));
+    if (!confirm(inUse
+        ? `«${formatConsumableName(c)}» выбран в текущем заказе. Удалить? В заказе подставится другой расходник того же вида.\n\nСовет: если он просто закончился — лучше снимите галочку «Есть в остатках» или отметьте «Скрыт».`
+        : `Удалить расходник «${formatConsumableName(c)}»?\n\nСовет: если он закончился или больше не закупается — лучше снимите «Есть в остатках» или отметьте «Скрыт», чтобы старые заказы открывались без изменений.`)) return;
+    appData.consumables.splice(idx, 1);
+    onWorksCatalogChanged(true);
+}
+
+function setOperationField(idx, field, value) {
+    const op = appData.operations[idx];
+    if (!op) return;
+    op[field] = value;
+    onWorksCatalogChanged(['unit', 'hidden', 'consumableKind'].includes(field));
+}
+
+function toggleOperationGroup(idx, groupCode, checked) {
+    const op = appData.operations[idx];
+    if (!op) return;
+    op.groups = op.groups.filter(g => g !== groupCode);
+    if (checked) op.groups.push(groupCode);
+    onWorksCatalogChanged(false);
+}
+
+function renderOperationsTable() {
+    const tbody = document.getElementById('operationsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = appData.operations.map((op, idx) => {
+        const unit = getWorkUnit(op.unit);
+        const isOrder = unit.scope === 'order';
+        const kindKnown = !op.consumableKind || appData.consumables.some(c => normalizeKind(c.kind) === normalizeKind(op.consumableKind));
+        return `
+        <tr style="${op.hidden ? 'opacity:0.55;' : ''}">
+            <td><input type="text" value="${escapeHtml(op.name)}" onchange="setOperationField(${idx}, 'name', this.value.trim() || 'Работа без названия')"></td>
+            <td>${isOrder
+                ? '<span style="font-size:11px; color: var(--text-muted);">— услуга на весь заказ —</span>'
+                : `<div class="groups-cell">${WORK_GROUP_CODES.map(code => `<label><input type="checkbox" ${op.groups.includes(code) ? 'checked' : ''} onchange="toggleOperationGroup(${idx}, '${code}', this.checked)">${escapeHtml(getGroupLabel(code))}</label>`).join('')}</div>`}</td>
+            <td><select onchange="setOperationField(${idx}, 'unit', this.value)">
+                ${WORK_UNITS.map(u => `<option value="${u.code}" ${op.unit === u.code ? 'selected' : ''}>${escapeHtml(u.label)}</option>`).join('')}
+            </select></td>
+            <td><input type="number" step="0.01" min="0" value="${op.price}" onchange="setOperationField(${idx}, 'price', Math.max(0, Number(this.value) || 0))"></td>
+            <td><input type="number" step="1" min="0" value="${op.minCharge}" onchange="setOperationField(${idx}, 'minCharge', Math.max(0, Number(this.value) || 0))"></td>
+            <td><input type="number" step="0.01" min="0" value="${op.laborCost}" onchange="setOperationField(${idx}, 'laborCost', Math.max(0, Number(this.value) || 0))"></td>
+            <td>${isOrder ? '' : `<input type="text" list="consumableKindsList" value="${escapeHtml(op.consumableKind)}" placeholder="нет" style="${kindKnown ? '' : 'border-color: var(--danger);'}" title="${kindKnown ? 'Вид расходника (как в колонке «Вид» у расходников). Пусто — работа без расходника.' : 'Нет ни одного расходника такого вида!'}" onchange="setOperationField(${idx}, 'consumableKind', this.value.trim())">`}</td>
+            <td>${isOrder || !op.consumableKind ? '' : `<input type="number" step="0.01" min="0" value="${op.consumablePerUnit}" onchange="setOperationField(${idx}, 'consumablePerUnit', Math.max(0, Number(this.value) || 0))">`}</td>
+            <td style="text-align:center;">${isOrder ? '' : `<input type="checkbox" ${op.hasComplexity ? 'checked' : ''} onchange="setOperationField(${idx}, 'hasComplexity', this.checked)">`}</td>
+            <td>${op.unit === 'grommet' || op.unit === 'perItem'
+                ? `<input type="number" step="1" min="0" value="${op.defaultParam}" title="${op.unit === 'grommet' ? 'Шаг люверсов по умолчанию, см' : 'Количество на 1 изделие по умолчанию'}" onchange="setOperationField(${idx}, 'defaultParam', Math.max(0, Number(this.value) || 0))"><div style="font-size:10px; color: var(--text-muted);">${op.unit === 'grommet' ? 'шаг, см' : 'на изделие'}</div>`
+                : ''}</td>
+            <td style="text-align:center;"><input type="checkbox" ${op.hidden ? 'checked' : ''} onchange="setOperationField(${idx}, 'hidden', this.checked)"></td>
+            <td><button class="btn btn-danger btn-sm" onclick="removeOperationRow(${idx})">🗑</button></td>
+        </tr>`;
+    }).join('');
+}
+
+function addOperationRow() {
+    appData.operations.push(normalizeOperation({ name: 'Новая работа', groups: [], unit: 'item' }));
+    onWorksCatalogChanged(true);
+}
+
+function removeOperationRow(idx) {
+    const op = appData.operations[idx];
+    if (!op) return;
+    const inUse = appData.positions.some(p => (p.works || []).some(w => w.opId === op.id)) || (appData.orderWorks || []).some(w => w.opId === op.id);
+    if (!confirm(inUse
+        ? `Работа «${op.name}» выбрана в текущем заказе и исчезнет из него. Удалить?\n\nСовет: чтобы просто перестать её предлагать — отметьте «Скрыта».`
+        : `Удалить работу «${op.name}»?\n\nСовет: чтобы просто перестать её предлагать, не ломая старые заказы — отметьте «Скрыта».`)) return;
+    appData.operations.splice(idx, 1);
+    onWorksCatalogChanged(true);
 }
 
 function removeMaterialRow(idx) {
@@ -2074,15 +2962,17 @@ function exportMaterialsExcel() {
     if (typeof XLSX === 'undefined') { alert('Библиотека Excel недоступна. Проверьте интернет.'); return; }
 
     const materialsRows = [
-        ['ID (не менять)', 'Название', 'Тип', 'Цена за м²', 'Валюта', 'Брак, %', 'Наценка, %', 'Наценка на перерасход, %', 'Приладка рулон, переопр.', 'Приладка лист, переопр.', 'Праймер', 'Режим печати'],
+        ['ID (не менять)', 'Название', 'Тип', 'Цена за м²', 'Валюта', 'Брак, %', 'Наценка, %', 'Наценка на перерасход, %', 'Приладка рулон, переопр.', 'Приладка лист, переопр.', 'Праймер', 'Режим печати', 'Группа'],
         ...appData.materials.map(m => [
             m.id, m.name, m.type, m.price, m.currency,
             m.scrapRate * 100, m.baseMarkup, m.wasteMarkup,
             m.setupFeeRollOverride === null || m.setupFeeRollOverride === undefined ? '' : m.setupFeeRollOverride,
             m.setupFeeSheetOverride === null || m.setupFeeSheetOverride === undefined ? '' : m.setupFeeSheetOverride,
-            m.defaultPrimer ? 'Да' : 'Нет', m.recommendedMode
+            m.defaultPrimer ? 'Да' : 'Нет', m.recommendedMode, getGroupLabel(m.group)
         ])
     ];
+    const consumablesRows = [CONSUMABLES_SHEET_HEADERS, ...appData.consumables.map(consumableToExcelRow)];
+    const operationsRows = [OPERATIONS_SHEET_HEADERS, ...appData.operations.map(operationToExcelRow)];
     const c = appData.config;
     const settingsRows = [
         ['Код параметра (не менять)', 'Значение', 'Единица', 'Описание'],
@@ -2105,7 +2995,11 @@ function exportMaterialsExcel() {
         ['powerPrinterKw', c.powerPrinterKw, 'кВт', 'Потребляемая мощность принтера'],
         ['powerClimateWorkKw', c.powerClimateWorkKw, 'кВт', 'Климатическое оборудование'],
         ['maxWidthM', c.limits.maxWidthM, 'м', 'Максимальная ширина печати'],
-        ['maxThicknessMm', c.limits.maxThicknessMm, 'мм', 'Максимальная толщина материала']
+        ['maxThicknessMm', c.limits.maxThicknessMm, 'мм', 'Максимальная толщина материала'],
+        ['worksDiscWholesale', c.worksTierDiscount.wholesale, '%', 'Доп. работы: скидка для уровня «Опт»'],
+        ['worksDiscDealer', c.worksTierDiscount.dealer, '%', 'Доп. работы: скидка для уровня «Дилер»'],
+        ['worksCoefMedium', c.worksComplexity.medium, 'коэффициент', 'Доп. работы: средняя сложность'],
+        ['worksCoefComplex', c.worksComplexity.complex, 'коэффициент', 'Доп. работы: сложная, мелкие элементы']
     ];
     const printModesRows = [
         ['Код (не менять для заводских)', 'Название', 'Описание', 'Скорость, м²/ч', 'Расход чернил, мл/м²', 'Кастомный'],
@@ -2119,23 +3013,31 @@ function exportMaterialsExcel() {
         ['1. Откройте лист «Материалы»: можно изменить цены и добавить новые строки.'],
         ['2. Откройте лист «Настройки»: меняйте только колонку «Значение».'],
         ['3. Откройте лист «Режимы печати»: скорость и расход чернил — калибровка по реальным замерам; новые строки с новым «Код» становятся кастомными режимами.'],
-        ['4. Не меняйте названия листов, заголовки и столбцы «ID» / «Код параметра» / «Код».'],
-        ['5. Сохраните файл .xlsx и загрузите его в калькулятор кнопкой «Импорт прайса».']
+        ['4. Листы «Расходники» и «Работы» — доп. работы (люверсы, скотч, ламинация и т.п.) и то, что на них тратится. Каждый вариант расходника — отдельная строка.'],
+        ['   Группы материалов: ' + MATERIAL_GROUPS.filter(g => g.code !== 'other').map(g => g.label).join(', ') + ' (или «Все»). Единицы работ: ' + WORK_UNITS.map(u => u.label).join('; ') + '.'],
+        ['5. Не меняйте названия листов, заголовки и столбцы «ID» / «Код параметра» / «Код». Для новых строк ID можно оставить пустым.'],
+        ['6. Сохраните файл .xlsx и загрузите его в калькулятор кнопкой «Импорт прайса». Заменятся только разделы, листы которых есть в файле.']
     ];
 
     const wsMaterials = XLSX.utils.aoa_to_sheet(materialsRows);
     const wsSettings = XLSX.utils.aoa_to_sheet(settingsRows);
     const wsPrintModes = XLSX.utils.aoa_to_sheet(printModesRows);
+    const wsConsumables = XLSX.utils.aoa_to_sheet(consumablesRows);
+    const wsOperations = XLSX.utils.aoa_to_sheet(operationsRows);
     const wsGuide = XLSX.utils.aoa_to_sheet(instructionRows);
-    wsMaterials['!cols'] = [18, 32, 12, 14, 11, 11, 14, 18, 16, 16, 11, 28].map(wch => ({ wch }));
+    wsMaterials['!cols'] = [18, 32, 12, 14, 11, 11, 14, 18, 16, 16, 11, 28, 18].map(wch => ({ wch }));
     wsSettings['!cols'] = [30, 18, 18, 42].map(wch => ({ wch }));
     wsPrintModes['!cols'] = [22, 32, 28, 14, 16, 10].map(wch => ({ wch }));
-    wsGuide['!cols'] = [{ wch: 95 }];
+    wsConsumables['!cols'] = [22, 18, 30, 11, 11, 22, 14, 14, 14, 9, 11, 16, 14, 10].map(wch => ({ wch }));
+    wsOperations['!cols'] = [18, 38, 34, 22, 12, 12, 14, 18, 12, 12, 16, 10].map(wch => ({ wch }));
+    wsGuide['!cols'] = [{ wch: 120 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, wsGuide, 'Инструкция');
     XLSX.utils.book_append_sheet(wb, wsMaterials, 'Материалы');
     XLSX.utils.book_append_sheet(wb, wsSettings, 'Настройки');
     XLSX.utils.book_append_sheet(wb, wsPrintModes, 'Режимы печати');
+    XLSX.utils.book_append_sheet(wb, wsConsumables, 'Расходники');
+    XLSX.utils.book_append_sheet(wb, wsOperations, 'Работы');
     XLSX.writeFile(wb, `Mimaki_Редактируемый_Прайс_${new Date().toLocaleDateString('ru-RU')}.xlsx`);
 }
 
@@ -2180,7 +3082,83 @@ function importPriceSettings(settingsRows) {
     setNumber('powerClimateWorkKw', value => c.powerClimateWorkKw = value);
     setNumber('maxWidthM', value => c.limits.maxWidthM = value, 0.001);
     setNumber('maxThicknessMm', value => c.limits.maxThicknessMm = value, 0.001);
+    c.worksTierDiscount = { ...defaultAppData.config.worksTierDiscount, ...(c.worksTierDiscount || {}) };
+    c.worksComplexity = { ...defaultAppData.config.worksComplexity, ...(c.worksComplexity || {}) };
+    setNumber('worksDiscWholesale', value => c.worksTierDiscount.wholesale = Math.min(100, value));
+    setNumber('worksDiscDealer', value => c.worksTierDiscount.dealer = Math.min(100, value));
+    setNumber('worksCoefMedium', value => c.worksComplexity.medium = value);
+    setNumber('worksCoefComplex', value => c.worksComplexity.complex = value);
     return Object.keys(values).length;
+}
+
+// Листы «Расходники» и «Работы» Excel-прайса. Заголовки — это «контракт» между
+// экспортом, импортом и шаблоном для заполнения: менять их нельзя.
+const CONSUMABLES_SHEET_HEADERS = ['ID (не менять)', 'Вид', 'Название', 'Ширина, мм', 'Толщина, мм', 'Состав / примечание', 'Формат (рулон/лист)', 'Единица (п.м./шт/м²)', 'Себестоимость за ед.', 'Валюта', 'Наценка, %', 'Подрезка листового, грн/ед', 'Есть в остатках (Да/Нет)', 'Скрыт (Да/Нет)'];
+const OPERATIONS_SHEET_HEADERS = ['ID (не менять)', 'Название работы', 'Для групп материалов', 'Единица расчёта', 'Цена за ед., грн', 'Минимум, грн', 'Себестоимость работы за ед., грн', 'Расходник (вид)', 'Расход расходника на ед.', 'Сложность (Да/Нет)', 'Параметр (шаг люверсов, см / кол-во на изделие)', 'Скрыта (Да/Нет)'];
+
+function consumableToExcelRow(c) {
+    return [c.id, c.kind, c.name, c.widthMm ?? '', c.thicknessMm ?? '', c.spec, c.format === 'sheet' ? 'лист' : 'рулон', getConsumableUnitLabel(c.unit),
+        c.cost, c.currency, c.markupPct, c.prepCostUah, c.inStock ? 'Да' : 'Нет', c.hidden ? 'Да' : 'Нет'];
+}
+
+function operationToExcelRow(op) {
+    const unit = getWorkUnit(op.unit);
+    return [op.id, op.name, unit.scope === 'order' ? '' : groupsToText(op.groups), unit.label, op.price, op.minCharge, op.laborCost,
+        op.consumableKind, op.consumableKind ? op.consumablePerUnit : '', op.hasComplexity ? 'Да' : 'Нет',
+        op.unit === 'grommet' || op.unit === 'perItem' ? op.defaultParam : '', op.hidden ? 'Да' : 'Нет'];
+}
+
+function importConsumablesRows(rows) {
+    const result = [];
+    rows.forEach((row, index) => {
+        const name = String(getExcelValue(row, 'Название') || '').trim();
+        const kind = String(getExcelValue(row, 'Вид') || '').trim();
+        if (!name && !kind) return; // пустая строка
+        const currency = String(getExcelValue(row, 'Валюта') || 'UAH').trim().toUpperCase();
+        const formatText = String(getExcelValue(row, 'Формат (рулон/лист)', 'Формат') || '').trim().toLowerCase();
+        result.push(normalizeConsumable({
+            id: String(getExcelValue(row, 'ID (не менять)', 'ID') || '').trim() || ('cons_new_' + Date.now() + '_' + index),
+            kind,
+            name: name || kind,
+            widthMm: getExcelValue(row, 'Ширина, мм'),
+            thicknessMm: getExcelValue(row, 'Толщина, мм'),
+            spec: String(getExcelValue(row, 'Состав / примечание', 'Примечание') || '').trim(),
+            format: /лист|sheet/.test(formatText) ? 'sheet' : 'roll',
+            unit: parseConsumableUnitText(getExcelValue(row, 'Единица (п.м./шт/м²)', 'Единица')),
+            cost: getExcelValue(row, 'Себестоимость за ед.', 'Себестоимость'),
+            currency: ['UAH', 'USD', 'EUR'].includes(currency) ? currency : 'UAH',
+            markupPct: getExcelValue(row, 'Наценка, %'),
+            prepCostUah: getExcelValue(row, 'Подрезка листового, грн/ед'),
+            inStock: parseYesNo(getExcelValue(row, 'Есть в остатках (Да/Нет)', 'Есть в остатках'), true),
+            hidden: parseYesNo(getExcelValue(row, 'Скрыт (Да/Нет)', 'Скрыт'), false)
+        }, index));
+    });
+    return result;
+}
+
+function importOperationsRows(rows) {
+    const result = [];
+    rows.forEach((row, index) => {
+        const name = String(getExcelValue(row, 'Название работы', 'Название') || '').trim();
+        if (!name) return;
+        const unit = parseWorkUnitText(getExcelValue(row, 'Единица расчёта', 'Единица'));
+        const paramRaw = getExcelValue(row, 'Параметр (шаг люверсов, см / кол-во на изделие)', 'Параметр');
+        result.push(normalizeOperation({
+            id: String(getExcelValue(row, 'ID (не менять)', 'ID') || '').trim() || ('op_new_' + Date.now() + '_' + index),
+            name,
+            groups: parseGroupsText(getExcelValue(row, 'Для групп материалов', 'Группы')),
+            unit,
+            price: getExcelValue(row, 'Цена за ед., грн', 'Цена'),
+            minCharge: getExcelValue(row, 'Минимум, грн', 'Минимум'),
+            laborCost: getExcelValue(row, 'Себестоимость работы за ед., грн', 'Себестоимость работы'),
+            consumableKind: String(getExcelValue(row, 'Расходник (вид)', 'Расходник') || '').trim(),
+            consumablePerUnit: getExcelValue(row, 'Расход расходника на ед.', 'Расход на ед.'),
+            hasComplexity: parseYesNo(getExcelValue(row, 'Сложность (Да/Нет)', 'Сложность'), false),
+            defaultParam: paramRaw === undefined ? (unit === 'grommet' ? 30 : 1) : paramRaw,
+            hidden: parseYesNo(getExcelValue(row, 'Скрыта (Да/Нет)', 'Скрыта'), false)
+        }, index));
+    });
+    return result;
 }
 
 function importPrintModes(printModesRows) {
@@ -2223,14 +3201,23 @@ function importMaterialsExcel(event) {
         try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, {type: 'array'});
-            const materialsSheet = workbook.Sheets['Материалы'] || workbook.Sheets['База_Материалов'] || workbook.Sheets[workbook.SheetNames[0]];
-            const json = XLSX.utils.sheet_to_json(materialsSheet);
+            const consumablesSheet = workbook.Sheets['Расходники'];
+            const operationsSheet = workbook.Sheets['Работы'];
+            // Лист материалов берём по имени. «Первый лист» — только для очень старых
+            // файлов без именованных листов; файл-шаблон доп. работ (только листы
+            // «Расходники»/«Работы») материалы не трогает.
+            const materialsSheet = workbook.Sheets['Материалы'] || workbook.Sheets['База_Материалов']
+                || (!consumablesSheet && !operationsSheet ? workbook.Sheets[workbook.SheetNames[0]] : null);
+            const json = materialsSheet ? XLSX.utils.sheet_to_json(materialsSheet) : [];
             const settingsSheet = workbook.Sheets['Настройки'];
             const settingsRows = settingsSheet ? XLSX.utils.sheet_to_json(settingsSheet) : [];
             const printModesSheet = workbook.Sheets['Режимы печати'];
             const printModesRows = printModesSheet ? XLSX.utils.sheet_to_json(printModesSheet) : [];
+            const consumablesRows = consumablesSheet ? XLSX.utils.sheet_to_json(consumablesSheet) : null;
+            const operationsRows = operationsSheet ? XLSX.utils.sheet_to_json(operationsSheet) : null;
 
-            if (!json || json.length === 0) throw new Error("Файл пуст или неправильного формата");
+            if (materialsSheet && (!json || json.length === 0)) throw new Error("Файл пуст или неправильного формата");
+            if (!materialsSheet && !consumablesRows && !operationsRows) throw new Error("В файле нет листов прайса");
 
             const importedMats = json.map((row, index) => {
                 const currency = String(getExcelValue(row, 'Валюта', 'Валюта (UAH/USD/EUR)') || appData.config.baseCurrency).toUpperCase();
@@ -2250,22 +3237,49 @@ function importMaterialsExcel(event) {
                     setupFeeRollOverride: rollOverrideRaw === undefined || rollOverrideRaw === '' ? null : validNumber(rollOverrideRaw, null, 0),
                     setupFeeSheetOverride: sheetOverrideRaw === undefined || sheetOverrideRaw === '' ? null : validNumber(sheetOverrideRaw, null, 0),
                     defaultPrimer: ['true', 'да', 'yes', '1'].includes(primer),
-                    recommendedMode: appData.printModes[modeCode] ? modeCode : 'MODE_CMYK_STD'
+                    recommendedMode: appData.printModes[modeCode] ? modeCode : 'MODE_CMYK_STD',
+                    group: (() => {
+                        const groupText = String(getExcelValue(row, 'Группа') || '').trim().toLowerCase();
+                        const found = MATERIAL_GROUPS.find(g => g.label.toLowerCase() === groupText || g.aliases.includes(groupText) || g.code === groupText);
+                        return found ? found.code : undefined; // пусто — угадаем по названию
+                    })()
                 };
-            });
+            }).map(normalizeMaterial);
 
-            appData.materials = importedMats;
+            if (importedMats.length) appData.materials = importedMats;
             const importedSettingsCount = importPriceSettings(settingsRows);
             const importedModesCount = importPrintModes(printModesRows);
+            let importedConsCount = 0, importedOpsCount = 0;
+            if (consumablesRows) {
+                appData.consumables = importConsumablesRows(consumablesRows);
+                importedConsCount = appData.consumables.length;
+            }
+            if (operationsRows) {
+                appData.operations = importOperationsRows(operationsRows);
+                importedOpsCount = appData.operations.length;
+            }
+            // Работы, ссылающиеся на вид расходника, которого нет в справочнике —
+            // сразу говорим об этом, чтобы опечатка («Скоч» вместо «Скотч») не прошла незамеченной.
+            const knownKinds = new Set(appData.consumables.map(c => normalizeKind(c.kind)));
+            const brokenKinds = [...new Set(appData.operations.filter(o => o.consumableKind && !knownKinds.has(normalizeKind(o.consumableKind))).map(o => o.consumableKind))];
             appData.isSavedToFile = false;
             markPriceChanged();
             document.getElementById('currentBaseCurrency').innerText = appData.config.baseCurrency;
             document.getElementById('dispUsdRate').innerText = appData.config.exchangeRates.USD.toFixed(2);
             document.getElementById('dispEurRate').innerText = appData.config.exchangeRates.EUR.toFixed(2);
             renderMaterialsTable();
+            fillWorksConfigInputs();
+            renderConsumablesTable();
+            renderOperationsTable();
             renderPositions();
             saveAppData();
-            alert(`Успешно загружено: ${importedMats.length} материалов${importedSettingsCount ? `, ${importedSettingsCount} настроек` : ''}${importedModesCount ? ` и ${importedModesCount} режимов печати` : ''}.`);
+            const parts = [];
+            if (importedMats.length) parts.push(`${importedMats.length} материалов`);
+            if (importedSettingsCount) parts.push(`${importedSettingsCount} настроек`);
+            if (importedModesCount) parts.push(`${importedModesCount} режимов печати`);
+            if (consumablesRows) parts.push(`${importedConsCount} расходников`);
+            if (operationsRows) parts.push(`${importedOpsCount} работ`);
+            alert(`Успешно загружено: ${parts.join(', ')}.${brokenKinds.length ? `\n\n⚠️ Внимание: у работ указан вид расходника, которого нет на листе «Расходники»: ${brokenKinds.join(', ')}. Проверьте написание — вид должен совпадать с колонкой «Вид».` : ''}\n\nНе забудьте нажать «☁️ Опубликовать прайс», чтобы изменения увидели коллеги.`);
         } catch (err) {
             alert('Ошибка чтения Excel файла. Проверьте, что вы загружаете скачанный шаблон.');
             console.error(err);
@@ -2287,7 +3301,8 @@ function printClientEstimate() {
     // в PDF для клиента не показываются никогда. А вот сам факт и размер скидки —
     // решение менеджера каждый раз заново: не все клиенты должны видеть, что им
     // вообще дали скидку и насколько щедро.
-    const hasAnyDiscount = appData.positions.some(p => Number(p.discountPercent) > 0);
+    const services = calculateOrderServices();
+    const hasAnyDiscount = appData.positions.some(p => Number(p.discountPercent) > 0) || (services.lines.length > 0 && services.discountPercent > 0);
     let showDiscount = false;
     if (hasAnyDiscount) {
         showDiscount = confirm('В заказе есть скидка.\n\nПоказать скидку в PDF для клиента?\n\nОК — показать размер скидки\nОтмена — не показывать (клиент увидит только итоговую цену)');
@@ -2321,11 +3336,31 @@ function printClientEstimate() {
 
         html += `<tr>
                     <td>${i + 1}</td>
-                    <td><strong>${escapeHtml(calc.mat.name)}</strong><br><small style="color:#555;">Качество: ${escapeHtml(calc.mode.name.split('(')[0])}</small></td>
+                    <td><strong>${escapeHtml(calc.mat.name)}</strong><br><small style="color:#555;">Качество: ${escapeHtml(calc.mode.name.split('(')[0])}</small>${calc.worksLines.length ? `<div style="margin-top:6px; font-size:12px; color:#333;">Включено:${calc.worksLines.map(l => `<br>• ${escapeHtml(l.op.name)}${l.cons ? ` (${escapeHtml(formatConsumableName(l.cons))})` : ''} — ${formatQty(l.qty)} ${l.unitShort}: ${l.total.toFixed(2)} ${appData.config.baseCurrency}`).join('')}</div>` : ''}</td>
                     <td>${sizeStr}</td>
                     <td>${pos.quantity} шт</td>
                     <td>${calc.finalUnitPrice.toFixed(2)} ${appData.config.baseCurrency}</td>
                     ${showDiscount ? `<td>${calc.discountPercent > 0 ? calc.discountPercent + '%' : '—'}</td>` : ''}
+                    <td>${sumCell}</td>
+                 </tr>`;
+    });
+
+    // Услуги на весь заказ — отдельными строками после позиций.
+    services.lines.forEach(line => {
+        if (line.total <= 0) return;
+        const lineFinal = line.total * (1 - services.discountPercent / 100);
+        grandTotal += lineFinal;
+        grandTotalBeforeDiscount += line.total;
+        const sumCell = showDiscount && services.discountPercent > 0
+            ? `<span style="text-decoration:line-through; color:#888; font-weight:400;">${line.total.toFixed(2)}</span> <strong>${lineFinal.toFixed(2)} ${appData.config.baseCurrency}</strong>`
+            : `<strong>${lineFinal.toFixed(2)} ${appData.config.baseCurrency}</strong>`;
+        html += `<tr>
+                    <td>—</td>
+                    <td><strong>${escapeHtml(line.op.name)}</strong><br><small style="color:#555;">Услуга на весь заказ</small></td>
+                    <td>—</td>
+                    <td>${formatQty(line.qty)} ${line.unitShort}</td>
+                    <td>${line.qty > 0 ? (lineFinal / line.qty).toFixed(2) + ' ' + appData.config.baseCurrency : '—'}</td>
+                    ${showDiscount ? `<td>${services.discountPercent > 0 ? services.discountPercent + '%' : '—'}</td>` : ''}
                     <td>${sumCell}</td>
                  </tr>`;
     });
@@ -2367,6 +3402,8 @@ function buildExportRows() {
             'Коммерч. печать м²': Number(calc.printSellM2.toFixed(2)),
             'Цена материала м²': Number(calc.matSellM2.toFixed(2)),
             'Приладка': Number(calc.effSetupFee.toFixed(2)),
+            'Доп. работы': calc.worksLines.map(l => `${l.op.name}${l.cons ? ` (${formatConsumableName(l.cons)})` : ''}: ${formatQty(l.qty)} ${l.unitShort} = ${l.total.toFixed(2)}`).join('; '),
+            'Сумма доп. работ': Number(calc.worksTotal.toFixed(2)),
             'Цена за 1 шт': Number(calc.finalUnitPrice.toFixed(2)),
             'Сумма без скидки': Number(calc.posGrandTotal.toFixed(2)),
             'Скидка, %': calc.discountPercent,
@@ -2375,6 +3412,24 @@ function buildExportRows() {
             'Валюта': appData.config.baseCurrency
         });
     });
+    // Услуги на весь заказ — отдельными строками с теми же колонками.
+    if (rows.length) {
+        const services = calculateOrderServices();
+        services.lines.forEach(line => {
+            const row = {};
+            Object.keys(rows[0]).forEach(key => { row[key] = ''; });
+            const lineFinal = line.total * (1 - services.discountPercent / 100);
+            row['№'] = 'Услуга';
+            row['Заказ'] = appData.orderName || '---';
+            row['Материал'] = line.op.name;
+            row['Тираж, шт'] = Number(formatQty(line.qty));
+            row['Сумма без скидки'] = Number(line.total.toFixed(2));
+            row['Скидка, %'] = services.discountPercent;
+            row['Сумма по позиции'] = Number(lineFinal.toFixed(2));
+            row['Валюта'] = appData.config.baseCurrency;
+            rows.push(row);
+        });
+    }
     return rows;
 }
 
