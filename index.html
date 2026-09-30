@@ -632,6 +632,7 @@ function normalizePosition(raw, index = 0) {
         manualSetupFee: source.manualSetupFee === null || source.manualSetupFee === undefined ? null : validNumber(source.manualSetupFee, null, 0),
         isMediumFormat: Boolean(source.isMediumFormat),
         hasNoStock: Boolean(source.hasNoStock),
+        noPrint: Boolean(source.noPrint),
         urgency: ['standard', '24h', 'same_day'].includes(source.urgency) ? source.urgency : 'standard',
         discountPercent: Math.min(100, validNumber(source.discountPercent, 0, 0)),
         discountNote: typeof source.discountNote === 'string' ? source.discountNote : '',
@@ -665,7 +666,9 @@ function normalizeMaterial(raw) {
         // Группа материала определяет, какие доп. работы предлагаются менеджеру.
         // У старых материалов (до появления доп. работ) группы нет — угадываем её по
         // названию; администратор потом может поправить в таблице материалов.
-        group: MATERIAL_GROUPS.some(g => g.code === source.group) ? source.group : guessMaterialGroup(source.name)
+        group: MATERIAL_GROUPS.some(g => g.code === source.group) ? source.group : guessMaterialGroup(source.name),
+        // Поставщик / номер КП — справочно, чтобы при следующей закупке было понятно, откуда цена.
+        supplier: typeof source.supplier === 'string' ? source.supplier : ''
     };
 }
 
@@ -800,7 +803,8 @@ function normalizeConsumable(raw, index = 0) {
         markupPct: validNumber(s.markupPct, 0, 0),
         prepCostUah: validNumber(s.prepCostUah, 0, 0),
         inStock: s.inStock === undefined ? true : Boolean(s.inStock),
-        hidden: Boolean(s.hidden)
+        hidden: Boolean(s.hidden),
+        supplier: typeof s.supplier === 'string' ? s.supplier : ''
     };
 }
 
@@ -1540,7 +1544,7 @@ const defaultAppData = {
     ],
     operations: [
         { id: 'op_contour_cut', name: 'Подрезка (плоттерная порезка по контуру)', groups: ['film'], unit: 'area', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: true, defaultParam: 1, hidden: false },
-        { id: 'op_trim', name: 'Порезка до размера', groups: ['film', 'banner', 'poster', 'paper', 'pvc'], unit: 'item', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_trim', name: 'Порезка до размера', groups: ['film', 'banner', 'poster', 'paper'], unit: 'item', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
         { id: 'op_weeding', name: 'Выборка лишнего', groups: ['film'], unit: 'area', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: true, defaultParam: 1, hidden: false },
         { id: 'op_transfer', name: 'Нанесение монтажной плёнки', groups: ['film'], unit: 'area', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Монтажная плёнка', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
         { id: 'op_lamination', name: 'Ламинация холодная', groups: ['film', 'poster', 'paper'], unit: 'area', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Ламинат', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
@@ -1548,9 +1552,11 @@ const defaultAppData = {
         { id: 'op_hem', name: 'Проклейка края баннера', groups: ['banner'], unit: 'perimeter', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
         { id: 'op_tape', name: 'Подклейка скотча', groups: ['banner', 'paper', 'pvc', 'acrylic'], unit: 'perimeter', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Скотч', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
         { id: 'op_crease', name: 'Биговка', groups: ['paper'], unit: 'perItem', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
-        { id: 'op_precise_cut', name: 'Точная порезка по меткам', groups: ['pvc'], unit: 'item', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_pvc_cut', name: 'Порезка ПВХ до размера', groups: ['pvc'], unit: 'perimeter', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_precise_cut', name: 'Точная порезка по меткам', groups: ['pvc'], unit: 'perimeter', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
         { id: 'op_bend', name: 'Сгиб струной', groups: ['pvc', 'acrylic'], unit: 'perItem', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
         { id: 'op_laser', name: 'Лазерная порезка', groups: ['acrylic'], unit: 'perimeter', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: true, defaultParam: 1, hidden: false },
+        { id: 'op_laser_thick', name: 'Лазерная порезка, толстый акрил 8–10 мм', groups: ['acrylic'], unit: 'perimeter', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: true, defaultParam: 1, hidden: false },
         { id: 'op_standoffs', name: 'Комплектование дистанционными держателями', groups: ['acrylic'], unit: 'perItem', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Держатель', consumablePerUnit: 1, hasComplexity: false, defaultParam: 4, hidden: false },
         { id: 'op_design', name: 'Услуги дизайнера', groups: [], unit: 'hour', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
         { id: 'op_prepress', name: 'Допечатная подготовка', groups: [], unit: 'fixed', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false }
@@ -1766,8 +1772,9 @@ function formatQty(value) {
 // Количество по умолчанию — из размеров печати и тиража. Размер печати считаем
 // размером готового изделия (порезка, периметр, люверсы — по нему).
 function computeWorkAutoQty(op, pos, param) {
-    const w = Number(pos.printWidthM) || 0;
-    const h = Number(pos.printHeightM) || 0;
+    // Без печати изделие = заготовка материала целиком.
+    const w = Number(pos.noPrint ? pos.matWidthM : pos.printWidthM) || 0;
+    const h = Number(pos.noPrint ? pos.matHeightM : pos.printHeightM) || 0;
     const q = Number(pos.quantity) || 0;
     const perimeterM = 2 * (w + h);
     switch (op.unit) {
@@ -1866,14 +1873,17 @@ function calculatePositionValues(pos) {
     const mat = appData.materials.find(m => m.id === pos.materialId) || appData.materials[0];
     const mode = appData.printModes[pos.modeCode] || appData.printModes.MODE_CMYK_STD;
 
-    const printPieceAreaM2 = pos.printWidthM * pos.printHeightM;
+    // «Без печати» — клиенту продаётся чистый материал: печати, времени машины,
+    // праймера и приладки нет, а вся заготовка идёт по наценке на перерасход.
+    const noPrint = Boolean(pos.noPrint);
+    const printPieceAreaM2 = noPrint ? 0 : pos.printWidthM * pos.printHeightM;
     const printAreaM2 = printPieceAreaM2 * pos.quantity;
 
     const matPieceAreaM2 = pos.matWidthM * pos.matHeightM;
     const matAreaM2 = matPieceAreaM2 * pos.quantity;
 
     const calcTimeH = printAreaM2 > 0 ? printAreaM2 / mode.speedM2h : 0;
-    const effTimeH = pos.manualTimeH !== null ? pos.manualTimeH : calcTimeH;
+    const effTimeH = noPrint ? 0 : (pos.manualTimeH !== null ? pos.manualTimeH : calcTimeH);
 
     const inkPriceMl = toBase(appData.config.inkPriceBottleUah, 'UAH') / 1000;
     const elecPriceKwh = toBase(appData.config.elecTariffKwh, 'UAH');
@@ -1912,7 +1922,12 @@ function calculatePositionValues(pos) {
     let wasteSellM2 = 0;
     let wasteCostTotal = 0;
     let matChargedAreaM2 = matAreaM2;
-    if (pos.effType === 'roll' && pos.matWidthM > pos.printWidthM) {
+    if (noPrint) {
+        wasteAreaM2 = matAreaM2;
+        matChargedAreaM2 = 0;
+        wasteSellM2 = matBase * (1 + Math.max(0, mat.wasteMarkup) / 100);
+        wasteCostTotal = wasteSellM2 * wasteAreaM2;
+    } else if (pos.effType === 'roll' && pos.matWidthM > pos.printWidthM) {
         wasteAreaM2 = (pos.matWidthM - pos.printWidthM) * pos.matHeightM * pos.quantity;
         matChargedAreaM2 = printAreaM2;
         const wasteMarkupPct = Math.max(0, mat.wasteMarkup);
@@ -1941,7 +1956,7 @@ function calculatePositionValues(pos) {
         const sheetFee = (mat.setupFeeSheetOverride !== null && mat.setupFeeSheetOverride !== undefined) ? mat.setupFeeSheetOverride : appData.setupFeeBase.sheetUah;
         calcSetupFee = toBase(sheetFee, 'UAH');
     }
-    const effSetupFee = pos.manualSetupFee !== null ? pos.manualSetupFee : calcSetupFee;
+    const effSetupFee = noPrint ? 0 : (pos.manualSetupFee !== null ? pos.manualSetupFee : calcSetupFee);
 
     const printTotal = (printSellM2 * printAreaM2) + effSetupFee;
     const matTotal = (matSellM2 * matChargedAreaM2) + wasteCostTotal;
@@ -1987,12 +2002,16 @@ function calculatePositionValues(pos) {
     const markupM2 = printAreaM2 > 0 ? totalMarkup / printAreaM2 : 0;
 
     let warnings = [];
-    if (pos.printWidthM > appData.config.limits.maxWidthM || pos.matWidthM > appData.config.limits.maxWidthM) warnings.push(`⚠️ Ширина превышает возможности принтера (${appData.config.limits.maxWidthM} м)`);
-    if (pos.printWidthM > pos.matWidthM) warnings.push(`⚠️ Область печати шире размера заготовки!`);
-    if (pos.printHeightM > pos.matHeightM) warnings.push(`⚠️ Длина печати больше длины заготовки!`);
+    if (noPrint) {
+        if (!(mat.wasteMarkup > 0)) warnings.push(`⚠️ У материала «${escapeHtml(mat.name)}» наценка на перерасход 0% — без печати он уйдёт клиенту по себестоимости. Задайте наценку в админке (раздел 4, «Нац. на перерасход»).`);
+    } else {
+        if (pos.printWidthM > appData.config.limits.maxWidthM || pos.matWidthM > appData.config.limits.maxWidthM) warnings.push(`⚠️ Ширина превышает возможности принтера (${appData.config.limits.maxWidthM} м)`);
+        if (pos.printWidthM > pos.matWidthM) warnings.push(`⚠️ Область печати шире размера заготовки!`);
+        if (pos.printHeightM > pos.matHeightM) warnings.push(`⚠️ Длина печати больше длины заготовки!`);
+    }
 
     return {
-        mat, mode, printAreaM2, matAreaM2,
+        mat, mode, noPrint, printAreaM2, matAreaM2,
         calcTimeH, effTimeH, directOpCostM2, amortM2, salaryM2, rentM2, scrapCostM2, primerM2, fullCostPriceM2,
         matSellM2, matChargedAreaM2, wasteAreaM2, wasteSellM2, wasteCostTotal,
         printSellM2, calcSetupFee, effSetupFee, printTotal, matTotal, worksLines: works.lines, worksTotal, totalWorksCost, exactGrandTotal, posGrandTotal, unitPrice,
@@ -2108,7 +2127,7 @@ function addPosition(isUserAction = true) {
         quantity: 1, modeCode: defMat.recommendedMode, usePrimer: defMat.defaultPrimer,
         customScrapRate: defMat.scrapRate, priceTier: 'retail',
         manualTimeH: null, manualSetupFee: null,
-        isMediumFormat: false, hasNoStock: false, urgency: 'standard',
+        isMediumFormat: false, hasNoStock: false, noPrint: false, urgency: 'standard',
         discountPercent: 0, discountNote: '',
         works: []
     });
@@ -2195,7 +2214,7 @@ function renderPositions() {
     appData.positions.forEach((pos, index) => {
         const calc = calculatePositionValues(pos);
 
-        if (!pos.matWidthM || !pos.printWidthM || pos.quantity <= 0) {
+        if (!pos.matWidthM || (!pos.noPrint && !pos.printWidthM) || pos.quantity <= 0) {
             container.innerHTML += `<div class="position-card error-box"><button class="btn btn-danger btn-sm" onclick="removePosition(${pos.id})" style="float:right;">🗑</button>⚠️ Укажите размеры в метрах и тираж > 0</div>`;
             return;
         }
@@ -2228,18 +2247,24 @@ function renderPositions() {
                     </select>
                 </div>
                 <div class="form-group">
+                    <label>Печать:</label>
+                    <label class="checkbox-item" style="padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: ${pos.noPrint ? '#fffbeb' : '#fff'};" title="Клиенту продаётся чистый материал без печати — вся заготовка идёт по наценке на перерасход">
+                        <input type="checkbox" ${pos.noPrint ? 'checked' : ''} onchange="updatePosField(${pos.id}, 'noPrint', this.checked)"> Без печати (чистый материал)
+                    </label>
+                </div>
+                <div class="form-group">
                     <label>Режим использования:</label>
                     <select class="form-control user-editable" onchange="updatePosField(${pos.id}, 'effType', this.value)">
                         <option value="roll" ${pos.effType === 'roll' ? 'selected' : ''}>Рулон (отрез)</option>
                         <option value="sheet" ${pos.effType === 'sheet' ? 'selected' : ''}>Листовой материал</option>
                     </select>
                 </div>
-                <div class="form-group">
+                ${pos.noPrint ? '' : `<div class="form-group">
                     <label>Режим печати Mimaki:</label>
                     <select class="form-control user-editable" onchange="updatePosField(${pos.id}, 'modeCode', this.value)">
                         ${Object.keys(appData.printModes).map(k => `<option value="${k}" ${k === pos.modeCode ? 'selected' : ''}>${escapeHtml(appData.printModes[k].name)} (${appData.printModes[k].speedM2h} м²/ч)</option>`).join('')}
                     </select>
-                </div>
+                </div>`}
                 
                 <div class="form-group">
                     <label>Тираж (шт):</label>
@@ -2260,7 +2285,10 @@ function renderPositions() {
                     </div>
                 </div>
 
-                <div class="size-group" style="border-left: 3px solid var(--success);">
+                ${pos.noPrint ? `<div class="size-group" style="border-left: 3px solid var(--warning); background: #fffbeb;">
+                    <div class="size-group-title" style="color: var(--warning);">Без печати</div>
+                    <div style="font-size: 13px;">Клиенту продаётся чистый материал: ${calc.matAreaM2.toFixed(2)} м² по ${calc.wasteSellM2.toFixed(2)} ${appData.config.baseCurrency}/м² (себестоимость + наценка на перерасход ${Math.max(0, calc.mat.wasteMarkup)}%). Печать, время машины, праймер и приладка не считаются. Доп. работы считаются от размеров заготовки.</div>
+                </div>` : `<div class="size-group" style="border-left: 3px solid var(--success);">
                     <div class="size-group-title" style="color: var(--success);">Размер области печати (м)</div>
                     <div class="size-inputs">
                         <div class="form-group">
@@ -2272,9 +2300,9 @@ function renderPositions() {
                             <input type="number" min="0.001" step="0.001" max="${pos.matHeightM}" class="form-control user-editable" value="${pos.printHeightM}" onchange="updatePosField(${pos.id}, 'printHeightM', Number(this.value))" title="Не может превышать длину материала (${pos.matHeightM} м)">
                         </div>
                     </div>
-                </div>
+                </div>`}
                 
-                <div class="form-group">
+                ${pos.noPrint ? '' : `<div class="form-group">
                     <label>Время печати (ч): ${pos.manualTimeH !== null ? `<button type="button" class="btn btn-outline btn-sm" style="padding:1px 6px; font-size:11px;" onclick="resetManualOverride(${pos.id}, 'manualTimeH')" title="Вернуться к автоматическому расчёту">↺ Авто</button>` : ''}</label>
                     <input type="number" min="0" step="0.1"
                            class="form-control user-editable ${pos.manualTimeH !== null ? 'highlight-input' : ''}"
@@ -2290,7 +2318,7 @@ function renderPositions() {
                            value="${calc.effSetupFee.toFixed(0)}"
                            onchange="updatePosField(${pos.id}, 'manualSetupFee', this.value === '' ? null : Number(this.value))"
                            title="Введите вручную или нажмите «↺ Авто» для авторасчета (${calc.calcSetupFee.toFixed(0)}); при смене тиража не пересчитывается автоматически">
-                </div>
+                </div>`}
 
                 <div class="form-group">
                     <label>Уровень цен:</label>
@@ -2303,9 +2331,9 @@ function renderPositions() {
             </div>
 
             <div class="checkbox-group">
-                <label class="checkbox-item"><input type="checkbox" ${pos.usePrimer ? 'checked' : ''} onchange="updatePosField(${pos.id}, 'usePrimer', this.checked)"> Праймер PR-200</label>
+                ${pos.noPrint ? '' : `<label class="checkbox-item"><input type="checkbox" ${pos.usePrimer ? 'checked' : ''} onchange="updatePosField(${pos.id}, 'usePrimer', this.checked)"> Праймер PR-200</label>
                 <label class="checkbox-item"><input type="checkbox" ${pos.isMediumFormat ? 'checked' : ''} onchange="updatePosField(${pos.id}, 'isMediumFormat', this.checked)"> Мелкий/Средний формат (+15%)</label>
-                <label class="checkbox-item"><input type="checkbox" ${pos.hasNoStock ? 'checked' : ''} onchange="updatePosField(${pos.id}, 'hasNoStock', this.checked)"> Свой материал без запаса (+30%)</label>
+                <label class="checkbox-item"><input type="checkbox" ${pos.hasNoStock ? 'checked' : ''} onchange="updatePosField(${pos.id}, 'hasNoStock', this.checked)"> Свой материал без запаса (+30%)</label>`}
                 <div class="form-group" style="margin:0;">
                     <select class="form-control user-editable" style="padding: 4px;" onchange="updatePosField(${pos.id}, 'urgency', this.value)">
                         <option value="standard" ${pos.urgency === 'standard' ? 'selected' : ''}>Стандарт срок</option>
@@ -2962,13 +2990,13 @@ function exportMaterialsExcel() {
     if (typeof XLSX === 'undefined') { alert('Библиотека Excel недоступна. Проверьте интернет.'); return; }
 
     const materialsRows = [
-        ['ID (не менять)', 'Название', 'Тип', 'Цена за м²', 'Валюта', 'Брак, %', 'Наценка, %', 'Наценка на перерасход, %', 'Приладка рулон, переопр.', 'Приладка лист, переопр.', 'Праймер', 'Режим печати', 'Группа'],
+        ['ID (не менять)', 'Название', 'Тип', 'Цена за м²', 'Валюта', 'Брак, %', 'Наценка, %', 'Наценка на перерасход, %', 'Приладка рулон, переопр.', 'Приладка лист, переопр.', 'Праймер', 'Режим печати', 'Группа', 'Поставщик'],
         ...appData.materials.map(m => [
             m.id, m.name, m.type, m.price, m.currency,
             m.scrapRate * 100, m.baseMarkup, m.wasteMarkup,
             m.setupFeeRollOverride === null || m.setupFeeRollOverride === undefined ? '' : m.setupFeeRollOverride,
             m.setupFeeSheetOverride === null || m.setupFeeSheetOverride === undefined ? '' : m.setupFeeSheetOverride,
-            m.defaultPrimer ? 'Да' : 'Нет', m.recommendedMode, getGroupLabel(m.group)
+            m.defaultPrimer ? 'Да' : 'Нет', m.recommendedMode, getGroupLabel(m.group), m.supplier || ''
         ])
     ];
     const consumablesRows = [CONSUMABLES_SHEET_HEADERS, ...appData.consumables.map(consumableToExcelRow)];
@@ -3025,10 +3053,10 @@ function exportMaterialsExcel() {
     const wsConsumables = XLSX.utils.aoa_to_sheet(consumablesRows);
     const wsOperations = XLSX.utils.aoa_to_sheet(operationsRows);
     const wsGuide = XLSX.utils.aoa_to_sheet(instructionRows);
-    wsMaterials['!cols'] = [18, 32, 12, 14, 11, 11, 14, 18, 16, 16, 11, 28, 18].map(wch => ({ wch }));
+    wsMaterials['!cols'] = [18, 32, 12, 14, 11, 11, 14, 18, 16, 16, 11, 28, 18, 26].map(wch => ({ wch }));
     wsSettings['!cols'] = [30, 18, 18, 42].map(wch => ({ wch }));
     wsPrintModes['!cols'] = [22, 32, 28, 14, 16, 10].map(wch => ({ wch }));
-    wsConsumables['!cols'] = [22, 18, 30, 11, 11, 22, 14, 14, 14, 9, 11, 16, 14, 10].map(wch => ({ wch }));
+    wsConsumables['!cols'] = [22, 18, 30, 11, 11, 22, 14, 14, 14, 9, 11, 16, 14, 10, 26].map(wch => ({ wch }));
     wsOperations['!cols'] = [18, 38, 34, 22, 12, 12, 14, 18, 12, 12, 16, 10].map(wch => ({ wch }));
     wsGuide['!cols'] = [{ wch: 120 }];
     const wb = XLSX.utils.book_new();
@@ -3093,12 +3121,12 @@ function importPriceSettings(settingsRows) {
 
 // Листы «Расходники» и «Работы» Excel-прайса. Заголовки — это «контракт» между
 // экспортом, импортом и шаблоном для заполнения: менять их нельзя.
-const CONSUMABLES_SHEET_HEADERS = ['ID (не менять)', 'Вид', 'Название', 'Ширина, мм', 'Толщина, мм', 'Состав / примечание', 'Формат (рулон/лист)', 'Единица (п.м./шт/м²)', 'Себестоимость за ед.', 'Валюта', 'Наценка, %', 'Подрезка листового, грн/ед', 'Есть в остатках (Да/Нет)', 'Скрыт (Да/Нет)'];
+const CONSUMABLES_SHEET_HEADERS = ['ID (не менять)', 'Вид', 'Название', 'Ширина, мм', 'Толщина, мм', 'Состав / примечание', 'Формат (рулон/лист)', 'Единица (п.м./шт/м²)', 'Себестоимость за ед.', 'Валюта', 'Наценка, %', 'Подрезка листового, грн/ед', 'Есть в остатках (Да/Нет)', 'Скрыт (Да/Нет)', 'Поставщик'];
 const OPERATIONS_SHEET_HEADERS = ['ID (не менять)', 'Название работы', 'Для групп материалов', 'Единица расчёта', 'Цена за ед., грн', 'Минимум, грн', 'Себестоимость работы за ед., грн', 'Расходник (вид)', 'Расход расходника на ед.', 'Сложность (Да/Нет)', 'Параметр (шаг люверсов, см / кол-во на изделие)', 'Скрыта (Да/Нет)'];
 
 function consumableToExcelRow(c) {
     return [c.id, c.kind, c.name, c.widthMm ?? '', c.thicknessMm ?? '', c.spec, c.format === 'sheet' ? 'лист' : 'рулон', getConsumableUnitLabel(c.unit),
-        c.cost, c.currency, c.markupPct, c.prepCostUah, c.inStock ? 'Да' : 'Нет', c.hidden ? 'Да' : 'Нет'];
+        c.cost, c.currency, c.markupPct, c.prepCostUah, c.inStock ? 'Да' : 'Нет', c.hidden ? 'Да' : 'Нет', c.supplier || ''];
 }
 
 function operationToExcelRow(op) {
@@ -3106,6 +3134,146 @@ function operationToExcelRow(op) {
     return [op.id, op.name, unit.scope === 'order' ? '' : groupsToText(op.groups), unit.label, op.price, op.minCharge, op.laborCost,
         op.consumableKind, op.consumableKind ? op.consumablePerUnit : '', op.hasComplexity ? 'Да' : 'Нет',
         op.unit === 'grommet' || op.unit === 'perItem' ? op.defaultParam : '', op.hidden ? 'Да' : 'Нет'];
+}
+
+// ------------------------------------------------------------------
+// ИМПОРТ ИЗ КОММЕРЧЕСКОГО ПРЕДЛОЖЕНИЯ ПОСТАВЩИКА (листы «Новые материалы» /
+// «Новые расходники»): строки ДОБАВЛЯЮТСЯ или ОБНОВЛЯЮТ существующие, остальной
+// прайс не трогается. Цена за м² / за единицу пересчитывается из цены поставщика
+// за рулон, лист или упаковку (и при желании — без ПДВ).
+// ------------------------------------------------------------------
+const VAT_RATE = 0.20;
+
+function excelNumber(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const n = Number(String(value).replace(/\s/g, '').replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+}
+
+function normalizeLookupText(value) {
+    return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function parseMaterialGroupText(value) {
+    const t = normalizeLookupText(value);
+    if (!t) return undefined;
+    const found = MATERIAL_GROUPS.find(g => g.label.toLowerCase() === t || g.aliases.includes(t) || g.code === t);
+    return found ? found.code : undefined;
+}
+
+// Цена материала за м² из КП: «за м²» — как есть, «за рулон / за лист» — делим на площадь.
+function supplierPricePerM2(row) {
+    const price = excelNumber(getExcelValue(row, 'Цена поставщика'));
+    const per = normalizeLookupText(getExcelValue(row, 'Цена за (м² / рулон / лист)', 'Цена за'));
+    const w = excelNumber(getExcelValue(row, 'Ширина, м'));
+    const l = excelNumber(getExcelValue(row, 'Длина, м'));
+    const minusVat = parseYesNo(getExcelValue(row, 'Вычесть ПДВ 20% (Да/Нет)', 'Вычесть ПДВ'), false);
+    let perM2 = null;
+    if (price !== null) {
+        if (!per || /м²|м2|кв/.test(per)) perM2 = price;
+        else if (w > 0 && l > 0) perM2 = price / (w * l);
+    }
+    if (perM2 !== null) return minusVat ? perM2 / (1 + VAT_RATE) : perM2;
+    // Не смогли посчитать из цены поставщика — берём готовую колонку (формула уже учла ПДВ).
+    return excelNumber(getExcelValue(row, 'Цена за м² (считается сама)', 'Цена за м²'));
+}
+
+function supplierCostPerUnit(row) {
+    const price = excelNumber(getExcelValue(row, 'Цена поставщика за упаковку', 'Цена поставщика'));
+    const qty = excelNumber(getExcelValue(row, 'Единиц в упаковке'));
+    const minusVat = parseYesNo(getExcelValue(row, 'Вычесть ПДВ 20% (Да/Нет)', 'Вычесть ПДВ'), false);
+    if (price !== null && qty > 0) {
+        const unit = price / qty;
+        return minusVat ? unit / (1 + VAT_RATE) : unit;
+    }
+    return excelNumber(getExcelValue(row, 'Себестоимость за ед. (считается сама)', 'Себестоимость за ед.'));
+}
+
+function mergeNewMaterialsRows(rows) {
+    let added = 0, updated = 0;
+    rows.forEach((row, index) => {
+        const name = String(getExcelValue(row, 'Название') || '').trim();
+        if (!name) return;
+        const id = String(getExcelValue(row, 'ID (пусто = новый)', 'ID (не менять)', 'ID') || '').trim();
+        const existing = (id && appData.materials.find(m => m.id === id))
+            || appData.materials.find(m => normalizeLookupText(m.name) === normalizeLookupText(name));
+        const patch = {};
+        const pricePerM2 = supplierPricePerM2(row);
+        if (pricePerM2 !== null) patch.price = Number(pricePerM2.toFixed(2));
+        const currency = String(getExcelValue(row, 'Валюта') || '').trim().toUpperCase();
+        if (['UAH', 'USD', 'EUR'].includes(currency)) patch.currency = currency;
+        const typeText = normalizeLookupText(getExcelValue(row, 'Тип (рулон/лист)', 'Тип'));
+        if (typeText) patch.type = /лист|sheet/.test(typeText) ? 'sheet' : 'roll';
+        const group = parseMaterialGroupText(getExcelValue(row, 'Группа'));
+        if (group) patch.group = group;
+        const scrap = excelNumber(getExcelValue(row, 'Брак, %'));
+        if (scrap !== null) patch.scrapRate = Math.max(0, scrap) / 100;
+        const markup = excelNumber(getExcelValue(row, 'Наценка, %'));
+        if (markup !== null) patch.baseMarkup = Math.max(0, markup);
+        const waste = excelNumber(getExcelValue(row, 'Наценка на перерасход, %'));
+        if (waste !== null) patch.wasteMarkup = Math.max(0, waste);
+        const primer = getExcelValue(row, 'Праймер (Да/Нет)', 'Праймер');
+        if (primer !== undefined) patch.defaultPrimer = parseYesNo(primer, false);
+        const mode = String(getExcelValue(row, 'Режим печати (код)', 'Режим печати') || '').trim();
+        if (mode && appData.printModes[mode]) patch.recommendedMode = mode;
+        const supplier = String(getExcelValue(row, 'Поставщик / КП', 'Поставщик') || '').trim();
+        if (supplier) patch.supplier = supplier;
+        if (existing) {
+            Object.assign(existing, patch);
+            updated++;
+        } else {
+            appData.materials.push(normalizeMaterial({
+                id: id || ('mat_kp_' + Date.now() + '_' + index),
+                name, scrapRate: 0.05, baseMarkup: 30, wasteMarkup: 0, currency: 'UAH', ...patch
+            }));
+            added++;
+        }
+    });
+    return { added, updated };
+}
+
+function mergeNewConsumablesRows(rows) {
+    let added = 0, updated = 0;
+    rows.forEach((row, index) => {
+        const name = String(getExcelValue(row, 'Название') || '').trim();
+        const kind = String(getExcelValue(row, 'Вид') || '').trim();
+        if (!name && !kind) return;
+        const id = String(getExcelValue(row, 'ID (пусто = новый)', 'ID (не менять)', 'ID') || '').trim();
+        const widthMm = excelNumber(getExcelValue(row, 'Ширина, мм'));
+        const thicknessMm = excelNumber(getExcelValue(row, 'Толщина, мм'));
+        const key = c => [normalizeKind(c.kind), normalizeLookupText(c.name), c.widthMm ?? '', c.thicknessMm ?? ''].join('|');
+        const rowKey = [normalizeKind(kind), normalizeLookupText(name || kind), widthMm ?? '', thicknessMm ?? ''].join('|');
+        const existing = (id && appData.consumables.find(c => c.id === id)) || appData.consumables.find(c => key(c) === rowKey);
+        const patch = { kind, name: name || kind, widthMm, thicknessMm };
+        const spec = String(getExcelValue(row, 'Состав / примечание') || '').trim();
+        if (spec) patch.spec = spec;
+        const formatText = normalizeLookupText(getExcelValue(row, 'Формат (рулон/лист)', 'Формат'));
+        if (formatText) patch.format = /лист|sheet/.test(formatText) ? 'sheet' : 'roll';
+        const unitText = getExcelValue(row, 'Единица учёта (п.м./шт/м²)', 'Единица (п.м./шт/м²)', 'Единица');
+        if (unitText !== undefined) patch.unit = parseConsumableUnitText(unitText);
+        const cost = supplierCostPerUnit(row);
+        if (cost !== null) patch.cost = Number(cost.toFixed(4));
+        const currency = String(getExcelValue(row, 'Валюта') || '').trim().toUpperCase();
+        if (['UAH', 'USD', 'EUR'].includes(currency)) patch.currency = currency;
+        const markup = excelNumber(getExcelValue(row, 'Наценка, %'));
+        if (markup !== null) patch.markupPct = Math.max(0, markup);
+        const prep = excelNumber(getExcelValue(row, 'Подрезка листового, грн/ед'));
+        if (prep !== null) patch.prepCostUah = Math.max(0, prep);
+        const stock = getExcelValue(row, 'Есть в остатках (Да/Нет)', 'Есть в остатках');
+        if (stock !== undefined) patch.inStock = parseYesNo(stock, true);
+        const hidden = getExcelValue(row, 'Скрыт (Да/Нет)', 'Скрыт');
+        if (hidden !== undefined) patch.hidden = parseYesNo(hidden, false);
+        const supplier = String(getExcelValue(row, 'Поставщик / КП', 'Поставщик') || '').trim();
+        if (supplier) patch.supplier = supplier;
+        if (existing) {
+            Object.assign(existing, normalizeConsumable({ ...existing, ...patch }));
+            updated++;
+        } else {
+            appData.consumables.push(normalizeConsumable({ id: id || ('cons_kp_' + Date.now() + '_' + index), inStock: true, ...patch }, index));
+            added++;
+        }
+    });
+    return { added, updated };
 }
 
 function importConsumablesRows(rows) {
@@ -3130,7 +3298,8 @@ function importConsumablesRows(rows) {
             markupPct: getExcelValue(row, 'Наценка, %'),
             prepCostUah: getExcelValue(row, 'Подрезка листового, грн/ед'),
             inStock: parseYesNo(getExcelValue(row, 'Есть в остатках (Да/Нет)', 'Есть в остатках'), true),
-            hidden: parseYesNo(getExcelValue(row, 'Скрыт (Да/Нет)', 'Скрыт'), false)
+            hidden: parseYesNo(getExcelValue(row, 'Скрыт (Да/Нет)', 'Скрыт'), false),
+            supplier: String(getExcelValue(row, 'Поставщик') || '').trim()
         }, index));
     });
     return result;
@@ -3203,11 +3372,13 @@ function importMaterialsExcel(event) {
             const workbook = XLSX.read(data, {type: 'array'});
             const consumablesSheet = workbook.Sheets['Расходники'];
             const operationsSheet = workbook.Sheets['Работы'];
+            const newMaterialsSheet = workbook.Sheets['Новые материалы'];
+            const newConsumablesSheet = workbook.Sheets['Новые расходники'];
             // Лист материалов берём по имени. «Первый лист» — только для очень старых
             // файлов без именованных листов; файл-шаблон доп. работ (только листы
             // «Расходники»/«Работы») материалы не трогает.
             const materialsSheet = workbook.Sheets['Материалы'] || workbook.Sheets['База_Материалов']
-                || (!consumablesSheet && !operationsSheet ? workbook.Sheets[workbook.SheetNames[0]] : null);
+                || (!consumablesSheet && !operationsSheet && !newMaterialsSheet && !newConsumablesSheet ? workbook.Sheets[workbook.SheetNames[0]] : null);
             const json = materialsSheet ? XLSX.utils.sheet_to_json(materialsSheet) : [];
             const settingsSheet = workbook.Sheets['Настройки'];
             const settingsRows = settingsSheet ? XLSX.utils.sheet_to_json(settingsSheet) : [];
@@ -3217,7 +3388,7 @@ function importMaterialsExcel(event) {
             const operationsRows = operationsSheet ? XLSX.utils.sheet_to_json(operationsSheet) : null;
 
             if (materialsSheet && (!json || json.length === 0)) throw new Error("Файл пуст или неправильного формата");
-            if (!materialsSheet && !consumablesRows && !operationsRows) throw new Error("В файле нет листов прайса");
+            if (!materialsSheet && !consumablesRows && !operationsRows && !newMaterialsSheet && !newConsumablesSheet) throw new Error("В файле нет листов прайса");
 
             const importedMats = json.map((row, index) => {
                 const currency = String(getExcelValue(row, 'Валюта', 'Валюта (UAH/USD/EUR)') || appData.config.baseCurrency).toUpperCase();
@@ -3242,7 +3413,8 @@ function importMaterialsExcel(event) {
                         const groupText = String(getExcelValue(row, 'Группа') || '').trim().toLowerCase();
                         const found = MATERIAL_GROUPS.find(g => g.label.toLowerCase() === groupText || g.aliases.includes(groupText) || g.code === groupText);
                         return found ? found.code : undefined; // пусто — угадаем по названию
-                    })()
+                    })(),
+                    supplier: String(getExcelValue(row, 'Поставщик') || '').trim()
                 };
             }).map(normalizeMaterial);
 
@@ -3258,6 +3430,10 @@ function importMaterialsExcel(event) {
                 appData.operations = importOperationsRows(operationsRows);
                 importedOpsCount = appData.operations.length;
             }
+            // Листы из КП поставщика — добавляют/обновляют, а не заменяют. Идут после
+            // полной замены (если она есть в том же файле), чтобы их данные не потерялись.
+            const kpMats = newMaterialsSheet ? mergeNewMaterialsRows(XLSX.utils.sheet_to_json(newMaterialsSheet)) : null;
+            const kpCons = newConsumablesSheet ? mergeNewConsumablesRows(XLSX.utils.sheet_to_json(newConsumablesSheet)) : null;
             // Работы, ссылающиеся на вид расходника, которого нет в справочнике —
             // сразу говорим об этом, чтобы опечатка («Скоч» вместо «Скотч») не прошла незамеченной.
             const knownKinds = new Set(appData.consumables.map(c => normalizeKind(c.kind)));
@@ -3279,6 +3455,8 @@ function importMaterialsExcel(event) {
             if (importedModesCount) parts.push(`${importedModesCount} режимов печати`);
             if (consumablesRows) parts.push(`${importedConsCount} расходников`);
             if (operationsRows) parts.push(`${importedOpsCount} работ`);
+            if (kpMats) parts.push(`материалы из КП: добавлено ${kpMats.added}, обновлено ${kpMats.updated}`);
+            if (kpCons) parts.push(`расходники из КП: добавлено ${kpCons.added}, обновлено ${kpCons.updated}`);
             alert(`Успешно загружено: ${parts.join(', ')}.${brokenKinds.length ? `\n\n⚠️ Внимание: у работ указан вид расходника, которого нет на листе «Расходники»: ${brokenKinds.join(', ')}. Проверьте написание — вид должен совпадать с колонкой «Вид».` : ''}\n\nНе забудьте нажать «☁️ Опубликовать прайс», чтобы изменения увидели коллеги.`);
         } catch (err) {
             alert('Ошибка чтения Excel файла. Проверьте, что вы загружаете скачанный шаблон.');
@@ -3329,14 +3507,16 @@ function printClientEstimate() {
 
         grandTotal += calc.finalTotal;
         grandTotalBeforeDiscount += calc.posGrandTotal;
-        const sizeStr = `${pos.printWidthM.toFixed(2)} x ${pos.printHeightM.toFixed(2)}`;
+        const sizeStr = pos.noPrint
+            ? `${pos.matWidthM.toFixed(2)} x ${pos.matHeightM.toFixed(2)}`
+            : `${pos.printWidthM.toFixed(2)} x ${pos.printHeightM.toFixed(2)}`;
         const sumCell = showDiscount && calc.discountPercent > 0
             ? `<span style="text-decoration:line-through; color:#888; font-weight:400;">${calc.posGrandTotal.toFixed(2)}</span> <strong>${calc.finalTotal.toFixed(2)} ${appData.config.baseCurrency}</strong>`
             : `<strong>${calc.finalTotal.toFixed(2)} ${appData.config.baseCurrency}</strong>`;
 
         html += `<tr>
                     <td>${i + 1}</td>
-                    <td><strong>${escapeHtml(calc.mat.name)}</strong><br><small style="color:#555;">Качество: ${escapeHtml(calc.mode.name.split('(')[0])}</small>${calc.worksLines.length ? `<div style="margin-top:6px; font-size:12px; color:#333;">Включено:${calc.worksLines.map(l => `<br>• ${escapeHtml(l.op.name)}${l.cons ? ` (${escapeHtml(formatConsumableName(l.cons))})` : ''} — ${formatQty(l.qty)} ${l.unitShort}: ${l.total.toFixed(2)} ${appData.config.baseCurrency}`).join('')}</div>` : ''}</td>
+                    <td><strong>${escapeHtml(calc.mat.name)}</strong><br><small style="color:#555;">${calc.noPrint ? 'Материал без печати' : `Качество: ${escapeHtml(calc.mode.name.split('(')[0])}`}</small>${calc.worksLines.length ? `<div style="margin-top:6px; font-size:12px; color:#333;">Включено:${calc.worksLines.map(l => `<br>• ${escapeHtml(l.op.name)}${l.cons ? ` (${escapeHtml(formatConsumableName(l.cons))})` : ''} — ${formatQty(l.qty)} ${l.unitShort}: ${l.total.toFixed(2)} ${appData.config.baseCurrency}`).join('')}</div>` : ''}</td>
                     <td>${sizeStr}</td>
                     <td>${pos.quantity} шт</td>
                     <td>${calc.finalUnitPrice.toFixed(2)} ${appData.config.baseCurrency}</td>
@@ -3384,13 +3564,13 @@ function buildExportRows() {
     const rows = [];
     appData.positions.forEach((pos, index) => {
         const calc = calculatePositionValues(pos);
-        if (!pos.matWidthM || !pos.printWidthM || pos.quantity <= 0) return;
+        if (!pos.matWidthM || (!pos.noPrint && !pos.printWidthM) || pos.quantity <= 0) return;
 
         rows.push({
             '№': index + 1,
             'Заказ': appData.orderName || '---',
             'Материал': calc.mat.name,
-            'Режим печати': calc.mode.name,
+            'Режим печати': calc.noPrint ? 'Без печати (чистый материал)' : calc.mode.name,
             'Ширина мат-ла, м': pos.matWidthM,
             'Длина мат-ла, м': pos.matHeightM,
             'Ширина печати, м': pos.printWidthM,
