@@ -490,6 +490,22 @@
     </div>
 </div>
 
+<!-- Новый заказ при несохранённых изменениях: сохранить (в Drive или файлом),
+     не сохранять или передумать. Новый заказ сбрасывает все ручные значения. -->
+<div class="modal" id="newOrderModal" style="z-index: 1500;">
+    <div class="modal-content" style="max-width: 500px;">
+        <h2 style="margin-bottom: 8px;">🆕 Новый заказ</h2>
+        <p style="color: var(--text-muted); margin-bottom: 8px; font-size: 14px;">В текущем заказе есть <strong>несохранённые изменения</strong>. Сохранить их перед тем, как начать новый?</p>
+        <p style="color: var(--text-muted); margin-bottom: 18px; font-size: 13px;">Новый заказ сбросит все позиции и все значения, введённые вручную (время печати, приладка, брак, скидки, «без печати», доп. работы, услуги), к значениям по умолчанию. Прайс и настройки админки не меняются.</p>
+        <div style="display:flex; flex-direction: column; gap: 8px;">
+            <button class="btn btn-primary" id="newOrderDriveBtn" style="padding: 10px;" onclick="newOrderChoice('drive')">☁️ Сохранить в Drive и начать новый</button>
+            <button class="btn btn-outline" style="padding: 10px;" onclick="newOrderChoice('file')">💾 Скачать файл проекта и начать новый</button>
+            <button class="btn btn-outline" style="padding: 10px; border-color: var(--danger); color: var(--danger);" onclick="newOrderChoice('discard')">🗑 Не сохранять, начать новый</button>
+            <button class="btn btn-outline" style="padding: 10px;" onclick="newOrderChoice('cancel')">↩ Отмена — вернуться к текущему заказу</button>
+        </div>
+    </div>
+</div>
+
 <!-- Окно-заслонка: просит обновить общий прайс перед работой, чтобы расчёты и правки
      в админке не велись на устаревших/несинхронизированных ценах. -->
 <div class="modal" id="priceGateModal" style="z-index: 2000;">
@@ -1267,6 +1283,7 @@ async function saveProjectToDrive() {
         updateProjectDriveIdDisplay();
         setCloudStatus('проект сохранён в Drive', 'connected');
         alert(`Проект сохранён в Google Drive.\n\nСсылка: ${result.metadata.webViewLink || `https://drive.google.com/open?id=${result.metadata.id}`}`);
+        return true;
     } catch (error) {
         if (error.status === 412) {
             setCloudStatus('проект изменён в другом браузере', 'warning');
@@ -1275,6 +1292,7 @@ async function saveProjectToDrive() {
             setCloudStatus('не удалось сохранить проект', 'error');
             alert(`Не удалось сохранить проект в Drive: ${error.message}`);
         }
+        return false;
     }
 }
 
@@ -2025,33 +2043,74 @@ function calculatePositionValues(pos) {
 // УПРАВЛЕНИЕ ЗАКАЗАМИ / ПРОЕКТАМИ
 // ------------------------------------------------------------------
 function startNewOrder() {
-    // Проверка 1: Если проект не сохранен, предлагаем это исправить
-    if (!appData.isSavedToFile && appData.positions.length > 0) {
-        const wannaSave = confirm('Внимание! У вас есть несохраненные изменения в проекте.\n\nХотите сохранить проект в файл перед закрытием?\n(Нажмите "ОК", чтобы скачать файл, или "Отмена", чтобы продолжить без сохранения)');
-        if (wannaSave) {
-            exportProject();
-        }
+    // Есть несохранённые изменения — одно окно с выбором: сохранить в Drive,
+    // скачать файлом, не сохранять или передумать. Раньше было два подряд
+    // вопроса «ОК/Отмена», и сохранить можно было только файлом на компьютер.
+    if (hasUnsavedOrderChanges()) {
+        openNewOrderModal();
+        return;
     }
+    if (confirm('Начать новый заказ?\n\nВсе позиции и все значения, введённые вручную (время печати, приладка, брак, скидки, доп. работы, услуги), сбросятся к значениям по умолчанию. Прайс и настройки админки не меняются.')) {
+        resetToNewOrder();
+    }
+}
 
-    // Проверка 2: Подтверждение очистки экрана
-    if (confirm('Вы уверены, что хотите очистить экран и начать новый заказ?')) {
-        appData.positions = [];
-        appData.orderWorks = [];
-        appData.servicesDiscountPercent = 0;
-        appData.orderName = '';
-        appData.orderNumber = null;
-        appData.discountNote = '';
-        document.getElementById('orderClientName').value = '';
-        appData.isSavedToFile = true; // Чистый проект считается сохраненным (не требует сохранения)
-        // Новый заказ — не тот же файл в Drive: отвязываем ID, иначе следующее
-        // «Сохранить в Drive» молча перезапишет старый проект новым.
-        googleDriveSettings.projectFileId = '';
-        saveGoogleDriveSettingsToBrowser();
-        driveState.projectFileId = null;
-        driveState.projectEtag = null;
-        updateProjectDriveIdDisplay();
-        addPosition(false); // Добавляем позицию, не помечая проект как "измененный"
+// Есть ли в текущем заказе то, что потеряется при сбросе.
+function hasUnsavedOrderChanges() {
+    return !appData.isSavedToFile && (appData.positions.length > 0 || (appData.orderWorks || []).length > 0);
+}
+
+function openNewOrderModal() {
+    document.getElementById('newOrderDriveBtn').style.display = googleDriveSettings.priceFileId || googleDriveSettings.clientId ? '' : 'none';
+    document.getElementById('newOrderDriveBtn').textContent = googleDriveSettings.projectFileId
+        ? `☁️ Сохранить в Drive${appData.orderNumber ? ` (заказ №${appData.orderNumber})` : ''} и начать новый`
+        : '☁️ Сохранить в Drive и начать новый';
+    document.getElementById('newOrderModal').style.display = 'flex';
+}
+
+function closeNewOrderModal() {
+    document.getElementById('newOrderModal').style.display = 'none';
+}
+
+async function newOrderChoice(choice) {
+    if (choice === 'cancel') { closeNewOrderModal(); return; }
+    if (choice === 'drive') {
+        closeNewOrderModal();
+        const saved = await saveProjectToDrive();
+        // Не удалось сохранить в Drive — заказ НЕ очищаем, чтобы ничего не потерять.
+        if (!saved) return;
     }
+    if (choice === 'file') {
+        exportProject();
+    }
+    closeNewOrderModal();
+    resetToNewOrder();
+}
+
+// Полный сброс заказа к значениям по умолчанию: новая чистая позиция (все ручные
+// поля — время печати, приладка, брак, скидки, «без печати», доп. работы —
+// по умолчанию), без услуг на заказ, без названия, номера и связи с файлом в Drive.
+// Прайс, материалы, расходники и настройки админки НЕ трогаются.
+function resetToNewOrder() {
+    appData.positions = [];
+    appData.orderWorks = [];
+    appData.servicesDiscountPercent = 0;
+    appData.orderName = '';
+    appData.orderNumber = null;
+    appData.discountNote = '';
+    document.getElementById('orderClientName').value = '';
+    document.getElementById('projectDiscountInput').value = 0;
+    document.getElementById('projectDiscountNote').value = '';
+    Object.keys(worksBlockOpenState).forEach(k => delete worksBlockOpenState[k]);
+    appData.isSavedToFile = true; // Чистый проект считается сохраненным (не требует сохранения)
+    // Новый заказ — не тот же файл в Drive: отвязываем ID, иначе следующее
+    // «Сохранить в Drive» молча перезапишет старый проект новым.
+    googleDriveSettings.projectFileId = '';
+    saveGoogleDriveSettingsToBrowser();
+    driveState.projectFileId = null;
+    driveState.projectEtag = null;
+    updateProjectDriveIdDisplay();
+    addPosition(false); // Добавляем позицию, не помечая проект как "измененный"
 }
 
 function exportProject() {
