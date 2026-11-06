@@ -335,6 +335,16 @@
         </div>
         <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">* Экспорт создаёт обычную таблицу Excel с листами «Инструкция», «Материалы», «Настройки», «Режимы печати», «Расходники» и «Работы». В ней можно менять цены, добавлять материалы, расходники и работы без программирования. При импорте заменяются только те разделы, листы которых есть в файле — например, файл только с листами «Расходники» и «Работы» не тронет материалы.</p>
 
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; background: #f8fafc;">
+            <div style="font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 4px;">🏷️ Группы материалов (для доп. работ)</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">От группы зависит, какие доп. работы предлагаются менеджеру. Встроенные группы менять нельзя; свои (например «Обои») можно добавить, переименовать и удалить. Новая группа сразу появится в колонке «Группа» таблицы материалов и галочкой в таблице работ (раздел 5) — отметьте там, какие работы к ней подходят.</div>
+            <div id="materialGroupsList" style="display:flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px;"></div>
+            <div style="display:flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                <input type="text" id="newMaterialGroupName" class="form-control" style="max-width: 260px; padding: 5px 8px;" placeholder="Название новой группы, напр. Обои" onkeydown="if(event.key==='Enter'){event.preventDefault(); addMaterialGroup();}">
+                <button class="btn btn-primary btn-sm" onclick="addMaterialGroup()">➕ Добавить группу</button>
+            </div>
+        </div>
+
         <div style="overflow-x: auto;">
             <table class="mat-table">
                 <thead>
@@ -724,7 +734,11 @@ function normalizeMaterials(materials) {
 // ------------------------------------------------------------------
 // Группы материалов. 'other' — «Другое / давальческое»: для таких материалов
 // менеджеру показываются все работы, потому что заранее неизвестно, что это.
-const MATERIAL_GROUPS = [
+// Встроенные группы. Администратор может добавлять свои (обои, текстиль и т.п.) —
+// они хранятся в прайсе (appData.customGroups) и встают перед «Другое».
+// MATERIAL_GROUPS / WORK_GROUP_CODES — «живые» массивы: пересобираются на месте
+// функцией rebuildMaterialGroups(), поэтому весь остальной код видит и свои группы.
+const BUILTIN_MATERIAL_GROUPS = [
     { code: 'film', label: 'Самоклейка', aliases: ['самоклейка', 'самоклеющаяся', 'самоклеющаяся пленка', 'пленка', 'плёнка'] },
     { code: 'banner', label: 'Баннер', aliases: ['баннер', 'банер'] },
     { code: 'poster', label: 'Ситик', aliases: ['ситик', 'постер', 'постерная', 'постерная бумага', 'ситилайт'] },
@@ -733,7 +747,51 @@ const MATERIAL_GROUPS = [
     { code: 'acrylic', label: 'Акрил', aliases: ['акрил', 'оргстекло'] },
     { code: 'other', label: 'Другое (все работы)', aliases: ['другое', 'давальческое'] }
 ];
-const WORK_GROUP_CODES = MATERIAL_GROUPS.filter(g => g.code !== 'other').map(g => g.code);
+const MATERIAL_GROUPS = [];
+const WORK_GROUP_CODES = [];
+
+function normalizeCustomGroups(list) {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set(BUILTIN_MATERIAL_GROUPS.map(g => g.code));
+    const result = [];
+    list.forEach(g => {
+        const label = String(g && g.label || '').trim();
+        const code = String(g && g.code || '').trim();
+        if (!label || !code || seen.has(code)) return;
+        seen.add(code);
+        result.push({ code, label });
+    });
+    return result;
+}
+
+function rebuildMaterialGroups() {
+    // appData объявлен ниже по коду: при самом первом вызове его ещё нет.
+    let customList = [];
+    try { customList = appData.customGroups; } catch (_) { customList = []; }
+    const custom = normalizeCustomGroups(customList);
+    const builtins = BUILTIN_MATERIAL_GROUPS.filter(g => g.code !== 'other');
+    const other = BUILTIN_MATERIAL_GROUPS.find(g => g.code === 'other');
+    MATERIAL_GROUPS.length = 0;
+    MATERIAL_GROUPS.push(...builtins, ...custom.map(g => ({ ...g, custom: true, aliases: [g.label.toLowerCase()] })), other);
+    WORK_GROUP_CODES.length = 0;
+    WORK_GROUP_CODES.push(...MATERIAL_GROUPS.filter(g => g.code !== 'other').map(g => g.code));
+}
+rebuildMaterialGroups();
+
+// Находит группу по названию; если такой нет и allowCreate — создаёт новую свою
+// группу (для импорта из Excel: «Обои» в колонке «Группа» сразу появятся в прайсе).
+function findOrCreateGroupByLabel(text, allowCreate) {
+    const t = String(text || '').trim();
+    const lower = t.toLowerCase();
+    if (!lower) return undefined;
+    const found = MATERIAL_GROUPS.find(g => g.label.toLowerCase() === lower || g.aliases.includes(lower) || g.code === lower);
+    if (found) return found.code;
+    if (!allowCreate || lower === 'все' || lower === 'всё') return undefined;
+    const code = 'grp_' + Date.now().toString(36) + Math.floor(Math.random() * 1000);
+    appData.customGroups = [...(appData.customGroups || []), { code, label: t.charAt(0).toUpperCase() + t.slice(1) }];
+    rebuildMaterialGroups();
+    return code;
+}
 
 function getGroupLabel(code) {
     const group = MATERIAL_GROUPS.find(g => g.code === code);
@@ -743,6 +801,9 @@ function getGroupLabel(code) {
 function guessMaterialGroup(name) {
     const n = String(name || '').toLowerCase();
     if (/давальч/.test(n)) return 'other';
+    // Свои группы — по вхождению названия группы в название материала («Обои Neschen» → «Обои»).
+    const custom = MATERIAL_GROUPS.find(g => g.custom && g.label.length >= 3 && n.includes(g.label.toLowerCase()));
+    if (custom) return custom.code;
     if (/акрил|оргстек/.test(n)) return 'acrylic';
     if (/пвх|pvc|\bпет\b|пэт|\bpet\b|petg/.test(n)) return 'pvc';
     if (/ба?н+ер|frontlit|blockout|backlit|сетк/.test(n)) return 'banner';
@@ -753,13 +814,14 @@ function guessMaterialGroup(name) {
 }
 
 // Разбор списка групп из Excel: «Самоклейка, Баннер», «Все» и т.п.
-function parseGroupsText(text) {
-    const tokens = String(text || '').toLowerCase().split(/[,;\n]+/).map(t => t.trim()).filter(Boolean);
-    if (tokens.some(t => t === 'все' || t === 'всё' || t === 'all')) return [...WORK_GROUP_CODES];
+function parseGroupsText(text, allowCreate = false) {
+    const tokens = String(text || '').split(/[,;\n]+/).map(t => t.trim()).filter(Boolean);
+    if (tokens.some(t => ['все', 'всё', 'all'].includes(t.toLowerCase()))) return [...WORK_GROUP_CODES];
     const result = [];
     tokens.forEach(token => {
-        const group = MATERIAL_GROUPS.find(g => g.code !== 'other' && (g.label.toLowerCase() === token || g.aliases.includes(token) || g.code === token));
-        if (group && !result.includes(group.code)) result.push(group.code);
+        if (['другое', 'другое (все работы)'].includes(token.toLowerCase())) return;
+        const code = findOrCreateGroupByLabel(token, allowCreate);
+        if (code && code !== 'other' && !result.includes(code)) result.push(code);
     });
     return result;
 }
@@ -1066,6 +1128,7 @@ function buildPriceSnapshot() {
         config: appData.config,
         setupFeeBase: appData.setupFeeBase,
         printModes: appData.printModes,
+        customGroups: appData.customGroups,
         materials: appData.materials,
         consumables: appData.consumables,
         operations: appData.operations
@@ -1100,6 +1163,9 @@ function applyPriceSnapshot(snapshot) {
     if (Number(savedConfig.exchangeRates?.USD) === 41.5) appData.config.exchangeRates.USD = 45.0;
     if (Number(savedConfig.exchangeRates?.EUR) === 45.2) appData.config.exchangeRates.EUR = 53.0;
     if (!['UAH', 'USD', 'EUR'].includes(appData.config.baseCurrency)) appData.config.baseCurrency = 'UAH';
+    // Свои группы — до материалов и работ: иначе их группы не распознаются.
+    if (Array.isArray(snapshot.customGroups)) appData.customGroups = normalizeCustomGroups(snapshot.customGroups);
+    rebuildMaterialGroups();
     appData.materials = normalizeMaterials(snapshot.materials) || appData.materials;
     // Старые прайсы (до появления доп. работ) не содержат этих справочников —
     // в этом случае оставляем то, что уже есть в браузере, а не стираем.
@@ -1232,6 +1298,7 @@ function buildProjectSnapshot() {
         config: appData.config,
         setupFeeBase: appData.setupFeeBase,
         printModes: appData.printModes,
+        customGroups: appData.customGroups,
         materials: appData.materials,
         consumables: appData.consumables,
         operations: appData.operations
@@ -1646,6 +1713,7 @@ const appData = {
     materials: JSON.parse(JSON.stringify(defaultAppData.materials)),
     consumables: JSON.parse(JSON.stringify(defaultAppData.consumables)),
     operations: JSON.parse(JSON.stringify(defaultAppData.operations)),
+    customGroups: [],
     positions: [],
     // Услуги на весь заказ (дизайнер, допечатная подготовка): [{opId, qty}]
     orderWorks: [],
@@ -1680,6 +1748,7 @@ function saveAppData() {
                 config: appData.config,
                 setupFeeBase: appData.setupFeeBase,
                 printModes: appData.printModes,
+                customGroups: appData.customGroups,
                 materials: appData.materials,
                 consumables: appData.consumables,
                 operations: appData.operations,
@@ -1745,6 +1814,8 @@ function loadAppData() {
             }
             if (p.setupFeeBase) appData.setupFeeBase = { ...JSON.parse(JSON.stringify(defaultAppData.setupFeeBase)), ...p.setupFeeBase };
             if (p.printModes && Object.keys(p.printModes).length) appData.printModes = p.printModes;
+            if (Array.isArray(p.customGroups)) appData.customGroups = normalizeCustomGroups(p.customGroups);
+            rebuildMaterialGroups();
             appData.materials = normalizeMaterials(p.materials) || appData.materials;
             if (Array.isArray(p.consumables)) appData.consumables = normalizeConsumables(p.consumables);
             if (Array.isArray(p.operations)) appData.operations = normalizeOperations(p.operations);
@@ -2760,6 +2831,7 @@ function reallyOpenAdminModal() {
     document.getElementById('setupFeeRollFactory').textContent = defaultAppData.setupFeeBase.rollUah + ' грн';
     document.getElementById('setupFeeSheetFactory').textContent = defaultAppData.setupFeeBase.sheetUah + ' грн';
     renderEngineeringSection();
+    renderMaterialGroupsList();
     renderMaterialsTable();
     fillWorksConfigInputs();
     renderConsumablesTable();
@@ -2805,7 +2877,7 @@ function renderMaterialsTable() {
         tr.innerHTML = `
             <td><input type="text" value="${escapeHtml(mat.name)}" onchange="appData.materials[${idx}].name=this.value; appData.isSavedToFile=false; saveAppData()"></td>
             <td>
-                <select onchange="appData.materials[${idx}].group=this.value; appData.isSavedToFile=false; renderPositions(); saveAppData()">
+                <select onchange="appData.materials[${idx}].group=this.value; appData.isSavedToFile=false; markPriceChanged(); renderMaterialGroupsList(); renderPositions(); saveAppData()">
                     ${MATERIAL_GROUPS.map(g => `<option value="${g.code}" ${mat.group === g.code ? 'selected' : ''}>${escapeHtml(g.label)}</option>`).join('')}
                 </select>
             </td>
@@ -2850,6 +2922,71 @@ function addNewMaterialRow() {
 // ------------------------------------------------------------------
 // АДМИНКА: ДОП. РАБОТЫ И РАСХОДНИКИ
 // ------------------------------------------------------------------
+// ------------------------------------------------------------------
+// АДМИНКА: СВОИ ГРУППЫ МАТЕРИАЛОВ
+// ------------------------------------------------------------------
+function renderMaterialGroupsList() {
+    const box = document.getElementById('materialGroupsList');
+    if (!box) return;
+    box.innerHTML = MATERIAL_GROUPS.map(g => {
+        const used = appData.materials.filter(m => m.group === g.code).length;
+        if (!g.custom) {
+            return `<span class="badge" style="background:#eef2f7; color: var(--text); font-weight: 500; font-size: 13px;" title="Встроенная группа">${escapeHtml(g.label)} <small style="color: var(--text-muted);">(${used})</small></span>`;
+        }
+        const codeArg = jsArg(g.code);
+        return `<span class="badge" style="display:inline-flex; gap:4px; align-items:center; background:#eff6ff; font-size: 13px;">
+            <input type="text" value="${escapeHtml(g.label)}" style="width:${Math.max(6, g.label.length + 2)}ch; padding:2px 4px; font-size:12px; border:1px solid var(--border); border-radius:4px;" title="Переименовать группу" onchange="renameMaterialGroup(${codeArg}, this.value)">
+            <small style="color: var(--text-muted);">(${used})</small>
+            <button class="btn btn-danger btn-sm" style="padding:0 6px;" title="Удалить группу" onclick="removeMaterialGroup(${codeArg})">✕</button>
+        </span>`;
+    }).join('');
+}
+
+function onMaterialGroupsChanged() {
+    rebuildMaterialGroups();
+    appData.isSavedToFile = false;
+    markPriceChanged();
+    renderMaterialGroupsList();
+    renderMaterialsTable();
+    renderOperationsTable();
+    renderPositions();
+    saveAppData();
+}
+
+function addMaterialGroup() {
+    const input = document.getElementById('newMaterialGroupName');
+    const label = String(input.value || '').trim();
+    if (!label) { input.focus(); return; }
+    const exists = MATERIAL_GROUPS.find(g => g.label.toLowerCase() === label.toLowerCase() || g.aliases.includes(label.toLowerCase()));
+    if (exists) { alert(`Группа «${exists.label}» уже есть.`); return; }
+    const code = 'grp_' + Date.now().toString(36) + Math.floor(Math.random() * 1000);
+    appData.customGroups = [...(appData.customGroups || []), { code, label }];
+    input.value = '';
+    onMaterialGroupsChanged();
+}
+
+function renameMaterialGroup(code, newLabel) {
+    const label = String(newLabel || '').trim();
+    const group = (appData.customGroups || []).find(g => g.code === code);
+    if (!group) return;
+    if (!label) { renderMaterialGroupsList(); return; }
+    const clash = MATERIAL_GROUPS.find(g => g.code !== code && g.label.toLowerCase() === label.toLowerCase());
+    if (clash) { alert(`Группа «${clash.label}» уже есть.`); renderMaterialGroupsList(); return; }
+    group.label = label;
+    onMaterialGroupsChanged();
+}
+
+function removeMaterialGroup(code) {
+    const group = (appData.customGroups || []).find(g => g.code === code);
+    if (!group) return;
+    const mats = appData.materials.filter(m => m.group === code).length;
+    if (!confirm(`Удалить группу «${group.label}»?${mats ? `\n\nМатериалы этой группы (${mats} шт.) перейдут в «Другое (все работы)».` : ''}`)) return;
+    appData.customGroups = appData.customGroups.filter(g => g.code !== code);
+    appData.materials.forEach(m => { if (m.group === code) m.group = 'other'; });
+    appData.operations.forEach(op => { op.groups = op.groups.filter(g => g !== code); });
+    onMaterialGroupsChanged();
+}
+
 function fillWorksConfigInputs() {
     const c = appData.config;
     document.getElementById('cfgWorksDiscWholesale').value = c.worksTierDiscount.wholesale;
@@ -3260,10 +3397,7 @@ function normalizeLookupText(value) {
 }
 
 function parseMaterialGroupText(value) {
-    const t = normalizeLookupText(value);
-    if (!t) return undefined;
-    const found = MATERIAL_GROUPS.find(g => g.label.toLowerCase() === t || g.aliases.includes(t) || g.code === t);
-    return found ? found.code : undefined;
+    return findOrCreateGroupByLabel(value, true);
 }
 
 // Цена материала за м² из КП: «за м²» — как есть, «за рулон / за лист» — делим на площадь.
@@ -3420,7 +3554,7 @@ function importOperationsRows(rows) {
         result.push(normalizeOperation({
             id: String(getExcelValue(row, 'ID (не менять)', 'ID') || '').trim() || ('op_new_' + Date.now() + '_' + index),
             name,
-            groups: parseGroupsText(getExcelValue(row, 'Для групп материалов', 'Группы')),
+            groups: parseGroupsText(getExcelValue(row, 'Для групп материалов', 'Группы'), true),
             unit,
             price: getExcelValue(row, 'Цена за ед., грн', 'Цена'),
             minCharge: getExcelValue(row, 'Минимум, грн', 'Минимум'),
@@ -3514,11 +3648,7 @@ function importMaterialsExcel(event) {
                     setupFeeSheetOverride: sheetOverrideRaw === undefined || sheetOverrideRaw === '' ? null : validNumber(sheetOverrideRaw, null, 0),
                     defaultPrimer: ['true', 'да', 'yes', '1'].includes(primer),
                     recommendedMode: appData.printModes[modeCode] ? modeCode : 'MODE_CMYK_STD',
-                    group: (() => {
-                        const groupText = String(getExcelValue(row, 'Группа') || '').trim().toLowerCase();
-                        const found = MATERIAL_GROUPS.find(g => g.label.toLowerCase() === groupText || g.aliases.includes(groupText) || g.code === groupText);
-                        return found ? found.code : undefined; // пусто — угадаем по названию
-                    })(),
+                    group: findOrCreateGroupByLabel(getExcelValue(row, 'Группа'), true), // пусто — угадаем по названию
                     supplier: String(getExcelValue(row, 'Поставщик') || '').trim()
                 };
             }).map(normalizeMaterial);
@@ -3548,6 +3678,7 @@ function importMaterialsExcel(event) {
             document.getElementById('currentBaseCurrency').innerText = appData.config.baseCurrency;
             document.getElementById('dispUsdRate').innerText = appData.config.exchangeRates.USD.toFixed(2);
             document.getElementById('dispEurRate').innerText = appData.config.exchangeRates.EUR.toFixed(2);
+            renderMaterialGroupsList();
             renderMaterialsTable();
             fillWorksConfigInputs();
             renderConsumablesTable();
