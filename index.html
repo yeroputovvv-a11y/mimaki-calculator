@@ -586,6 +586,33 @@ const driveState = {
     pendingAdminOpen: false
 };
 
+// Версия общего прайса, на которой основан локальный прайс в этом браузере, и
+// флаг «есть неопубликованные правки». Раньше это жило только в памяти вкладки:
+// после перезагрузки страницы калькулятор «забывал» и то, и другое — публикация
+// требовала заново обновить прайс (что стирало правки), а фоновое автообновление
+// могло молча заменить неопубликованные правки общей версией.
+const PRICE_BASE_KEY = 'mimaki-price-base-v1';
+
+function persistPriceBase() {
+    try {
+        localStorage.setItem(PRICE_BASE_KEY, JSON.stringify({
+            fileId: googleDriveSettings.priceFileId || '',
+            version: driveState.priceVersion,
+            dirty: Boolean(driveState.priceDirty)
+        }));
+    } catch (_) { /* хранилище недоступно — работаем как раньше */ }
+}
+
+(function restorePriceBase() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(PRICE_BASE_KEY) || 'null');
+        if (saved && saved.fileId && saved.fileId === googleDriveSettings.priceFileId) {
+            driveState.priceVersion = saved.version || null;
+            driveState.priceDirty = Boolean(saved.dirty);
+        }
+    } catch (_) { /* нет сохранённых данных */ }
+})();
+
 function loadGoogleDriveSettings() {
     try {
         const saved = JSON.parse(localStorage.getItem(GOOGLE_DRIVE_SETTINGS_KEY) || '{}');
@@ -881,6 +908,7 @@ function setCloudStatus(message, state = '') {
 
 function markPriceChanged() {
     driveState.priceDirty = true;
+    persistPriceBase();
     if (googleDriveSettings.priceFileId) {
         setCloudStatus('прайс изменён — опубликуйте изменения', 'warning');
     }
@@ -911,6 +939,7 @@ function saveGoogleDriveSettings() {
         driveState.priceVersion = null;
         driveState.priceEtag = null;
         driveState.priceDirty = false;
+        persistPriceBase();
     }
 
     closeGoogleDriveModal();
@@ -1102,6 +1131,7 @@ async function createSharedPriceFile() {
         driveState.priceVersion = result.metadata.version;
         driveState.priceEtag = result.etag;
         driveState.priceDirty = false;
+        persistPriceBase();
         document.getElementById('cfgGooglePriceFileId').value = result.metadata.id;
         setCloudStatus('общий прайс создан', 'connected');
         alert(`Общий прайс создан. Откройте файл в Google Drive и предоставьте коллегам доступ «Редактор».\n\nСсылка: ${result.metadata.webViewLink || `https://drive.google.com/open?id=${result.metadata.id}`}`);
@@ -1133,6 +1163,7 @@ async function loadPriceFromDrive(options = {}) {
         driveState.priceVersion = remote.metadata.version;
         driveState.priceEtag = remote.etag;
         driveState.priceDirty = false;
+        persistPriceBase();
         setCloudStatus(`прайс актуален · ${new Date(remote.metadata.modifiedTime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`, 'connected');
         return true;
     } catch (error) {
@@ -1174,6 +1205,7 @@ async function publishPriceToDrive() {
         driveState.priceVersion = result.metadata.version;
         driveState.priceEtag = result.etag;
         driveState.priceDirty = false;
+        persistPriceBase();
         setCloudStatus('прайс опубликован', 'connected');
     } catch (error) {
         if (error.status === 412) {
@@ -3726,7 +3758,8 @@ window.onload = () => {
     document.getElementById('materialsTableBody').addEventListener('change', markPriceChanged);
     window.addEventListener('focus', autoRefreshPrice);
     startDrivePricePolling();
-    setCloudStatus(googleDriveSettings.priceFileId ? 'Drive настроен — прайс из локального кэша' : 'Drive не настроен', googleDriveSettings.priceFileId ? 'warning' : '');
+    if (googleDriveSettings.priceFileId && driveState.priceDirty) setCloudStatus('есть неопубликованные правки прайса — опубликуйте их (Админка, раздел 6)', 'warning');
+    else setCloudStatus(googleDriveSettings.priceFileId ? 'Drive настроен — прайс из локального кэша' : 'Drive не настроен', googleDriveSettings.priceFileId ? 'warning' : '');
     if (appData.positions.length === 0) addPosition(false); // Загружаем первую пустую позицию без отметки "Изменено"
     else renderPositions();
     updateProjectDriveIdDisplay();
