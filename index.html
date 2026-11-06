@@ -491,11 +491,12 @@
         <div class="form-group" style="margin-bottom: 15px;">
             <label>ID общего файла прайса:</label>
             <input type="text" id="cfgGooglePriceFileId" class="form-control" placeholder="Вставьте ID или ссылку Google Drive">
+            <div id="nonDefaultPriceWarning" class="warning-box" style="display:none; margin-top:8px;">⚠️ Этот браузер подключён НЕ к стандартному общему прайсу. Коллеги работают со стандартным файлом и ваших правок не увидят. <button class="btn btn-outline" style="margin-top:6px;" onclick="resetPriceFileToDefault()">↩️ Вернуть стандартный общий прайс</button></div>
         </div>
         <p style="font-size:12px; color:var(--text-muted); margin-bottom: 18px;">Client ID не является секретом. Он привязан к адресу, на котором открыт калькулятор. После изменения Client ID перезагрузите страницу.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <button class="btn btn-primary" onclick="saveGoogleDriveSettings()">Сохранить настройки</button>
-            <button class="btn btn-outline" onclick="createSharedPriceFile()">Создать общий прайс в Drive</button>
+            <button class="btn btn-outline" onclick="createSharedPriceFile()" title="Только для первой настройки — общий прайс уже создан">Создать НОВЫЙ файл прайса (не нужно)</button>
         </div>
     </div>
 </div>
@@ -976,9 +977,33 @@ function markPriceChanged() {
     }
 }
 
+function updateNonDefaultPriceWarning() {
+    const box = document.getElementById('nonDefaultPriceWarning');
+    if (box) box.style.display = googleDriveSettings.priceFileId !== DEFAULT_GOOGLE_PRICE_FILE_ID ? 'block' : 'none';
+}
+
+async function resetPriceFileToDefault() {
+    if (!confirm('Подключить этот браузер к стандартному общему прайсу (тому же, что у коллег)?\n\nВаши текущие цены в этом браузере сохранятся как неопубликованные правки. Потом нажмите «☁️ Опубликовать прайс», чтобы отправить их коллегам, или «↻ Обновить прайс», чтобы взять общий.')) return;
+    googleDriveSettings.priceFileId = DEFAULT_GOOGLE_PRICE_FILE_ID;
+    saveGoogleDriveSettingsToBrowser();
+    driveState.priceVersion = null;
+    driveState.priceEtag = null;
+    driveState.priceDirty = true;
+    try {
+        const token = await getGoogleDriveAccessToken();
+        const r = await fetch(`https://www.googleapis.com/drive/v3/files/${DEFAULT_GOOGLE_PRICE_FILE_ID}?fields=version&supportsAllDrives=true`, { headers: { Authorization: `Bearer ${token}` } });
+        if (r.ok) driveState.priceVersion = (await r.json()).version;
+    } catch (_) {}
+    persistPriceBase();
+    document.getElementById('cfgGooglePriceFileId').value = DEFAULT_GOOGLE_PRICE_FILE_ID;
+    updateNonDefaultPriceWarning();
+    setCloudStatus('подключён стандартный общий прайс — опубликуйте или обновите прайс');
+}
+
 function openGoogleDriveModal() {
     document.getElementById('cfgGoogleClientId').value = googleDriveSettings.clientId;
     document.getElementById('cfgGooglePriceFileId').value = googleDriveSettings.priceFileId;
+    updateNonDefaultPriceWarning();
     document.getElementById('googleDriveModal').style.display = 'flex';
 }
 
@@ -1185,6 +1210,7 @@ function applyPriceSnapshot(snapshot) {
 }
 
 async function createSharedPriceFile() {
+    if (!confirm('ВНИМАНИЕ: общий прайс уже существует.\n\nЭта кнопка создаёт ОТДЕЛЬНЫЙ НОВЫЙ файл и переключает на него только этот браузер. Коллеги останутся на старом файле и перестанут видеть ваши правки.\n\nНажимайте «ОК», только если вы точно переносите прайс в новый файл.')) return;
     try {
         if (!googleDriveSettings.clientId) {
             alert('Сначала укажите OAuth Client ID Google и сохраните настройки.');
