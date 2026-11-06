@@ -1150,12 +1150,26 @@ async function publishPriceToDrive() {
         alert('Создайте общий прайс или укажите его ID в настройках Drive.');
         return;
     }
-    if (!driveState.priceEtag) {
-        alert('Сначала загрузите общий прайс из Drive. Это защищает от перезаписи изменений коллег.');
+    // Google Drive не отдаёт браузеру ETag (заголовок скрыт CORS), поэтому
+    // раньше эта проверка требовала ETag и публикация отказывала ВСЕГДА. Признак
+    // «общий прайс загружен в этой вкладке» — известный номер версии файла.
+    if (!driveState.priceVersion && !driveState.priceEtag) {
+        alert('Сначала загрузите общий прайс из Drive (кнопка «↻ Обновить прайс»). Это защищает от перезаписи изменений коллег.\n\nВнимание: обновление заменит ваши неопубликованные правки общей версией.');
         return;
     }
     try {
         setCloudStatus('публикуем прайс…');
+        // Защита от перезаписи правок коллег: если файл в Drive успел поменяться
+        // после того, как мы его загрузили, его версия будет другой.
+        if (driveState.priceVersion) {
+            const metaResponse = await driveFetch(`${GOOGLE_DRIVE_API}/files/${encodeURIComponent(googleDriveSettings.priceFileId)}?fields=version`);
+            const meta = await metaResponse.json();
+            if (String(meta.version) !== String(driveState.priceVersion)) {
+                const conflict = new Error('version mismatch');
+                conflict.status = 412;
+                throw conflict;
+            }
+        }
         const result = await updateDriveJson(googleDriveSettings.priceFileId, buildPriceSnapshot(), driveState.priceEtag);
         driveState.priceVersion = result.metadata.version;
         driveState.priceEtag = result.etag;
