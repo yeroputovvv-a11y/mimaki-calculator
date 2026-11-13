@@ -3517,7 +3517,7 @@ function mergeNewConsumablesRows(rows) {
         const unitText = getExcelValue(row, 'Единица учёта (п.м./шт/м²)', 'Единица (п.м./шт/м²)', 'Единица');
         if (unitText !== undefined) patch.unit = parseConsumableUnitText(unitText);
         const cost = supplierCostPerUnit(row);
-        if (cost !== null) patch.cost = Number(cost.toFixed(4));
+        if (cost !== null) patch.cost = Number(cost.toFixed(6));
         const currency = String(getExcelValue(row, 'Валюта') || '').trim().toUpperCase();
         if (['UAH', 'USD', 'EUR'].includes(currency)) patch.currency = currency;
         const markup = excelNumber(getExcelValue(row, 'Наценка, %'));
@@ -3543,13 +3543,19 @@ function mergeNewConsumablesRows(rows) {
 
 function importConsumablesRows(rows) {
     const result = [];
+    // Строка с тем же ID ниже ЗАМЕНЯЕТ строку выше (например, оранжевая строка
+    // с ценой в евро под исходной строкой в гривне) — дублей в справочнике не будет.
+    const pushOrReplace = item => {
+        const at = result.findIndex(c => c.id === item.id);
+        if (at >= 0) result[at] = item; else result.push(item);
+    };
     rows.forEach((row, index) => {
         const name = String(getExcelValue(row, 'Название') || '').trim();
         const kind = String(getExcelValue(row, 'Вид') || '').trim();
         if (!name && !kind) return; // пустая строка
         const currency = String(getExcelValue(row, 'Валюта') || 'UAH').trim().toUpperCase();
         const formatText = String(getExcelValue(row, 'Формат (рулон/лист)', 'Формат') || '').trim().toLowerCase();
-        result.push(normalizeConsumable({
+        pushOrReplace(normalizeConsumable({
             id: String(getExcelValue(row, 'ID (не менять)', 'ID') || '').trim() || ('cons_new_' + Date.now() + '_' + index),
             kind,
             name: name || kind,
