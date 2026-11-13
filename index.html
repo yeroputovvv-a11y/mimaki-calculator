@@ -2858,6 +2858,12 @@ function updateProjectDiscountNote(value) {
 // иначе можно незаметно исправить цены поверх устаревших и потерять правки
 // коллег. Если нет — сперва показываем заслонку с предложением обновить.
 function openAdminModal() {
+    // Есть неопубликованные правки — заслонку не показываем: «Обновить прайс» в ней
+    // стёр бы эти правки, а публикация и так сверяет версию файла на Drive.
+    if (driveState.priceDirty) {
+        reallyOpenAdminModal();
+        return;
+    }
     if (googleDriveSettings.priceFileId && (!driveState.accessToken || Date.now() >= driveState.accessTokenExpiresAt - 60000)) {
         driveState.pendingAdminOpen = true;
         showPriceGate('admin');
