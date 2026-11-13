@@ -835,7 +835,11 @@ function groupsToText(groups) {
 
 // Единицы расчёта работ. scope 'order' — услуга на весь заказ, а не на позицию.
 const WORK_UNITS = [
-    { code: 'area', label: 'м² печати', short: 'м²', scope: 'position' },
+    // «м² печати» — только напечатанная область (подрезка по контуру, выборка);
+    // если позиция «Без печати» — берётся вся заготовка. «м² заготовки» — всегда
+    // вся заготовка материала (ламинация до порезки, прикатка на основу).
+    { code: 'area', label: 'м² печати', short: 'м² печати', scope: 'position' },
+    { code: 'blankArea', label: 'м² заготовки', short: 'м² заготовки', scope: 'position' },
     { code: 'item', label: 'за изделие', short: 'шт', scope: 'position' },
     { code: 'perimeter', label: 'п.м. по периметру', short: 'п.м.', scope: 'position' },
     { code: 'grommet', label: 'люверсы по шагу', short: 'шт', scope: 'position' },
@@ -854,6 +858,7 @@ function parseWorkUnitText(text) {
     if (exact) return exact.code;
     if (/люверс/.test(t)) return 'grommet';
     if (/периметр|п\.?\s?м/.test(t)) return 'perimeter';
+    if (/заготов/.test(t)) return 'blankArea';
     if (/м²|м2|кв/.test(t)) return 'area';
     if (/час/.test(t)) return 'hour';
     if (/заказ/.test(t)) return 'fixed';
@@ -1704,7 +1709,8 @@ const defaultAppData = {
         { id: 'op_trim', name: 'Порезка до размера', groups: ['film', 'banner', 'poster', 'paper'], unit: 'item', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
         { id: 'op_weeding', name: 'Выборка лишнего', groups: ['film'], unit: 'area', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: true, defaultParam: 1, hidden: false },
         { id: 'op_transfer', name: 'Нанесение монтажной плёнки', groups: ['film'], unit: 'area', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Монтажная плёнка', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
-        { id: 'op_lamination', name: 'Ламинация холодная', groups: ['film', 'poster', 'paper'], unit: 'area', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Ламинат', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_lamination', name: 'Ламинация холодная', groups: ['film', 'poster', 'paper'], unit: 'blankArea', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Ламинат', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
+        { id: 'op_mounting', name: 'Прикатка самоклейки на основу', groups: ['film'], unit: 'blankArea', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
         { id: 'op_grommets', name: 'Установка люверсов', groups: ['banner', 'paper', 'pvc'], unit: 'grommet', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Люверс', consumablePerUnit: 1, hasComplexity: false, defaultParam: 30, hidden: false },
         { id: 'op_hem', name: 'Проклейка края баннера', groups: ['banner'], unit: 'perimeter', price: 0, minCharge: 0, laborCost: 0, consumableKind: '', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
         { id: 'op_tape', name: 'Подклейка скотча', groups: ['banner', 'paper', 'pvc', 'acrylic'], unit: 'perimeter', price: 0, minCharge: 0, laborCost: 0, consumableKind: 'Скотч', consumablePerUnit: 1, hasComplexity: false, defaultParam: 1, hidden: false },
@@ -1940,6 +1946,7 @@ function computeWorkAutoQty(op, pos, param) {
     const perimeterM = 2 * (w + h);
     switch (op.unit) {
         case 'area': return w * h * q;
+        case 'blankArea': return (Number(pos.matWidthM) || 0) * (Number(pos.matHeightM) || 0) * q;
         case 'item': return q;
         case 'perimeter': return perimeterM * q;
         case 'grommet': {
