@@ -858,13 +858,34 @@ function parseWorkUnitText(text) {
     if (exact) return exact.code;
     if (/люверс/.test(t)) return 'grommet';
     if (/периметр|п\.?\s?м/.test(t)) return 'perimeter';
-    if (/заготов/.test(t)) return 'blankArea';
+    if (/заготов/.test(t) || (/м²|м2|кв/.test(t) && /издел/.test(t))) return 'blankArea';
     if (/м²|м2|кв/.test(t)) return 'area';
     if (/час/.test(t)) return 'hour';
     if (/заказ/.test(t)) return 'fixed';
     if (/лини|на издели/.test(t)) return 'perItem';
     if (/издели|шт/.test(t)) return 'item';
     return 'item';
+}
+
+// Формат расходника: рулон / лист (лист можно подрезать) / штучный / комплект.
+const CONSUMABLE_FORMATS = [
+    { code: 'roll', label: 'рулон' },
+    { code: 'sheet', label: 'лист' },
+    { code: 'pcs', label: 'шт' },
+    { code: 'set', label: 'комплект' }
+];
+
+function parseConsumableFormatText(text) {
+    const t = String(text ?? '').trim().toLowerCase();
+    if (!t) return 'roll';
+    if (/лист|sheet/.test(t)) return 'sheet';
+    if (/компл|набор|set/.test(t)) return 'set';
+    if (/^шт|штуч|штук|pcs|^ед/.test(t)) return 'pcs';
+    return 'roll';
+}
+
+function getConsumableFormatLabel(code) {
+    return (CONSUMABLE_FORMATS.find(f => f.code === code) || CONSUMABLE_FORMATS[0]).label;
 }
 
 const CONSUMABLE_UNITS = [
@@ -907,7 +928,7 @@ function normalizeConsumable(raw, index = 0) {
         widthMm: s.widthMm === null || s.widthMm === undefined || s.widthMm === '' ? null : validNumber(s.widthMm, null, 0),
         thicknessMm: s.thicknessMm === null || s.thicknessMm === undefined || s.thicknessMm === '' ? null : validNumber(s.thicknessMm, null, 0),
         spec: typeof s.spec === 'string' ? s.spec : '',
-        format: s.format === 'sheet' ? 'sheet' : 'roll',
+        format: CONSUMABLE_FORMATS.some(f => f.code === s.format) ? s.format : 'roll',
         unit: CONSUMABLE_UNITS.some(u => u.code === s.unit) ? s.unit : 'm',
         cost: validNumber(s.cost, 0, 0),
         currency: ['UAH', 'USD', 'EUR'].includes(s.currency) ? s.currency : 'UAH',
@@ -1928,6 +1949,7 @@ function formatConsumableName(c) {
     if (c.thicknessMm) parts.push(`толщ. ${c.thicknessMm} мм`);
     if (c.spec) parts.push(c.spec);
     if (c.format === 'sheet') parts.push('листовой');
+    if (c.format === 'set') parts.push('комплект');
     return parts.join(', ');
 }
 
@@ -3068,8 +3090,7 @@ function renderConsumablesTable() {
             <td><input type="number" step="0.1" min="0" value="${numOrEmpty(c.thicknessMm)}" onchange="setConsumableField(${idx}, 'thicknessMm', this.value === '' ? null : Math.max(0, Number(this.value)))"></td>
             <td><input type="text" value="${escapeHtml(c.spec)}" placeholder="напр. акриловый клей" onchange="setConsumableField(${idx}, 'spec', this.value)"></td>
             <td><select onchange="setConsumableField(${idx}, 'format', this.value)">
-                <option value="roll" ${c.format === 'roll' ? 'selected' : ''}>Рулон</option>
-                <option value="sheet" ${c.format === 'sheet' ? 'selected' : ''}>Лист</option>
+                ${CONSUMABLE_FORMATS.map(f => `<option value="${f.code}" ${c.format === f.code ? 'selected' : ''}>${f.label}</option>`).join('')}
             </select></td>
             <td><select onchange="setConsumableField(${idx}, 'unit', this.value)">
                 ${CONSUMABLE_UNITS.map(u => `<option value="${u.code}" ${c.unit === u.code ? 'selected' : ''}>${u.label}</option>`).join('')}
@@ -3348,6 +3369,14 @@ function getExcelValue(row, ...columnNames) {
     for (const columnName of columnNames) {
         if (row[columnName] !== undefined && row[columnName] !== null && row[columnName] !== '') return row[columnName];
     }
+    // Заголовок могли подправить в скобках («Формат (рулон/лист/шт)») — сравниваем
+    // часть до скобки, чтобы такая правка не обнуляла колонку при импорте.
+    const base = name => String(name).split('(')[0].trim().toLowerCase();
+    const keys = Object.keys(row);
+    for (const columnName of columnNames) {
+        const key = keys.find(k => base(k) === base(columnName));
+        if (key !== undefined && row[key] !== undefined && row[key] !== null && row[key] !== '') return row[key];
+    }
     return undefined;
 }
 
@@ -3396,11 +3425,11 @@ function importPriceSettings(settingsRows) {
 
 // Листы «Расходники» и «Работы» Excel-прайса. Заголовки — это «контракт» между
 // экспортом, импортом и шаблоном для заполнения: менять их нельзя.
-const CONSUMABLES_SHEET_HEADERS = ['ID (не менять)', 'Вид', 'Название', 'Ширина, мм', 'Толщина, мм', 'Состав / примечание', 'Формат (рулон/лист)', 'Единица (п.м./шт/м²)', 'Себестоимость за ед.', 'Валюта', 'Наценка, %', 'Подрезка листового, грн/ед', 'Есть в остатках (Да/Нет)', 'Скрыт (Да/Нет)', 'Поставщик'];
+const CONSUMABLES_SHEET_HEADERS = ['ID (не менять)', 'Вид', 'Название', 'Ширина, мм', 'Толщина, мм', 'Состав / примечание', 'Формат (рулон/лист/шт/комплект)', 'Единица (п.м./шт/м²)', 'Себестоимость за ед.', 'Валюта', 'Наценка, %', 'Подрезка листового, грн/ед', 'Есть в остатках (Да/Нет)', 'Скрыт (Да/Нет)', 'Поставщик'];
 const OPERATIONS_SHEET_HEADERS = ['ID (не менять)', 'Название работы', 'Для групп материалов', 'Единица расчёта', 'Цена за ед., грн', 'Минимум, грн', 'Себестоимость работы за ед., грн', 'Расходник (вид)', 'Расход расходника на ед.', 'Сложность (Да/Нет)', 'Параметр (шаг люверсов, см / кол-во на изделие)', 'Скрыта (Да/Нет)'];
 
 function consumableToExcelRow(c) {
-    return [c.id, c.kind, c.name, c.widthMm ?? '', c.thicknessMm ?? '', c.spec, c.format === 'sheet' ? 'лист' : 'рулон', getConsumableUnitLabel(c.unit),
+    return [c.id, c.kind, c.name, c.widthMm ?? '', c.thicknessMm ?? '', c.spec, getConsumableFormatLabel(c.format), getConsumableUnitLabel(c.unit),
         c.cost, c.currency, c.markupPct, c.prepCostUah, c.inStock ? 'Да' : 'Нет', c.hidden ? 'Да' : 'Нет', c.supplier || ''];
 }
 
@@ -3519,8 +3548,8 @@ function mergeNewConsumablesRows(rows) {
         const patch = { kind, name: name || kind, widthMm, thicknessMm };
         const spec = String(getExcelValue(row, 'Состав / примечание') || '').trim();
         if (spec) patch.spec = spec;
-        const formatText = normalizeLookupText(getExcelValue(row, 'Формат (рулон/лист)', 'Формат'));
-        if (formatText) patch.format = /лист|sheet/.test(formatText) ? 'sheet' : 'roll';
+        const formatText = normalizeLookupText(getExcelValue(row, 'Формат (рулон/лист/шт/комплект)', 'Формат (рулон/лист)', 'Формат'));
+        if (formatText) patch.format = parseConsumableFormatText(formatText);
         const unitText = getExcelValue(row, 'Единица учёта (п.м./шт/м²)', 'Единица (п.м./шт/м²)', 'Единица');
         if (unitText !== undefined) patch.unit = parseConsumableUnitText(unitText);
         const cost = supplierCostPerUnit(row);
@@ -3561,15 +3590,20 @@ function importConsumablesRows(rows) {
         const kind = String(getExcelValue(row, 'Вид') || '').trim();
         if (!name && !kind) return; // пустая строка
         const currency = String(getExcelValue(row, 'Валюта') || 'UAH').trim().toUpperCase();
-        const formatText = String(getExcelValue(row, 'Формат (рулон/лист)', 'Формат') || '').trim().toLowerCase();
+        const formatText = String(getExcelValue(row, 'Формат (рулон/лист/шт/комплект)', 'Формат (рулон/лист)', 'Формат') || '').trim().toLowerCase();
+        // Ширина текстом («1м; 1,26м») числом не является — не теряем её, а дописываем в примечание.
+        const widthRaw = getExcelValue(row, 'Ширина, мм');
+        const widthNum = excelNumber(widthRaw);
+        let specText = String(getExcelValue(row, 'Состав / примечание', 'Примечание') || '').trim();
+        if (widthRaw !== undefined && widthNum === null) specText = [specText, `ширина: ${String(widthRaw).trim()}`].filter(Boolean).join(' · ');
         pushOrReplace(normalizeConsumable({
             id: String(getExcelValue(row, 'ID (не менять)', 'ID') || '').trim() || ('cons_new_' + Date.now() + '_' + index),
             kind,
             name: name || kind,
-            widthMm: getExcelValue(row, 'Ширина, мм'),
-            thicknessMm: getExcelValue(row, 'Толщина, мм'),
-            spec: String(getExcelValue(row, 'Состав / примечание', 'Примечание') || '').trim(),
-            format: /лист|sheet/.test(formatText) ? 'sheet' : 'roll',
+            widthMm: widthNum,
+            thicknessMm: excelNumber(getExcelValue(row, 'Толщина, мм')),
+            spec: specText,
+            format: parseConsumableFormatText(formatText),
             unit: parseConsumableUnitText(getExcelValue(row, 'Единица (п.м./шт/м²)', 'Единица')),
             cost: getExcelValue(row, 'Себестоимость за ед.', 'Себестоимость'),
             currency: ['UAH', 'USD', 'EUR'].includes(currency) ? currency : 'UAH',
