@@ -109,6 +109,20 @@
         .more-hint { display: none; position: absolute; top: 1px; right: 1px; bottom: 1px; width: 70px; pointer-events: none; background: linear-gradient(to right, rgba(255,255,255,0), rgba(37,99,235,0.18)); border-radius: 0 6px 6px 0; z-index: 6; }
         .more-hint span { position: sticky; top: 40px; display: block; margin: 40px 4px 0 auto; width: max-content; max-width: 66px; background: var(--primary); color: #fff; font-size: 11px; font-weight: 600; line-height: 1.2; padding: 4px 6px; border-radius: 10px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.25); }
         .table-scroll-wrap.has-more-right .more-hint { display: block; }
+        .more-hint-down { display: none; position: absolute; left: 1px; right: 1px; bottom: 1px; height: 46px; pointer-events: none; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(37,99,235,0.18)); border-radius: 0 0 6px 6px; z-index: 6; text-align: center; }
+        .more-hint-down span { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); background: var(--primary); color: #fff; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 10px; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,0.25); }
+        .table-scroll-wrap.has-more-down .more-hint-down { display: block; }
+        .table-scroll.scrolled-down .mat-table thead th { box-shadow: 0 4px 6px -3px rgba(15, 23, 42, 0.35); border-bottom: 2px solid #94a3b8; }
+        /* Перестановка строк */
+        .mat-table .move-th { width: 46px; min-width: 46px; text-align: center; }
+        .mat-table td.move-cell { width: 46px; min-width: 46px; padding: 2px 3px; text-align: center; white-space: nowrap; cursor: grab; user-select: none; }
+        .move-cell .drag-handle { display: block; font-size: 15px; line-height: 1; color: #64748b; }
+        .move-cell button { border: 1px solid var(--border); background: #f8fafc; border-radius: 3px; font-size: 9px; line-height: 1; padding: 2px 3px; cursor: pointer; color: #334155; }
+        .move-cell button:disabled { opacity: 0.3; cursor: default; }
+        .move-cell button:not(:disabled):hover { background: #dbeafe; }
+        .mat-table tr.dragging td { opacity: 0.45; }
+        .mat-table tr.drop-above td { box-shadow: inset 0 3px 0 var(--primary); }
+        .mat-table tr.drop-below td { box-shadow: inset 0 -3px 0 var(--primary); }
         .modal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
         .modal-section { font-weight: 700; color: var(--primary); margin: 20px 0 10px 0; border-bottom: 2px solid var(--border); padding-bottom: 5px; font-size: 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 
@@ -368,10 +382,11 @@
             </div>
         </div>
 
-        <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="1">
+        <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="2">
             <table class="mat-table">
                 <thead>
                     <tr>
+                        <th class="move-th" title="Порядок строк: перетащите строку за ⠿ или нажимайте ▲ ▼. Порядок здесь = порядок в списках у менеджера">↕</th>
                         <th style="width: 24%;">Название материала</th>
                         <th style="width: 11%;" title="От группы зависит, какие доп. работы предлагаются менеджеру для этого материала">Группа (для доп. работ)</th>
                         <th style="width: 10%;">Тип по умолч.</th>
@@ -416,10 +431,11 @@
             <span>🧻 Расходники</span>
             <button class="btn btn-primary btn-sm" onclick="addConsumableRow()">➕ Добавить расходник</button>
         </div>
-        <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="2">
+        <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="3">
             <table class="mat-table" style="min-width: 1500px;">
                 <thead>
                     <tr>
+                        <th class="move-th" title="Порядок строк: перетащите строку за ⠿ или нажимайте ▲ ▼. Порядок здесь = порядок в списках у менеджера">↕</th>
                         <th style="min-width: 150px;">Вид</th>
                         <th style="min-width: 230px;">Название</th>
                         <th style="min-width: 70px;">Ширина, мм</th>
@@ -453,10 +469,11 @@
             <strong>час</strong> и <strong>за заказ</strong> — услуги на весь заказ (показываются отдельным блоком под позициями).
             «Параметр» — шаг люверсов в см или количество на изделие по умолчанию. «Расход на ед.» — сколько единиц расходника уходит на единицу работы (например, 1.05 м² ламината на 1 м²).
         </p>
-        <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="1">
+        <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="2">
             <table class="mat-table" style="min-width: 1500px;">
                 <thead>
                     <tr>
+                        <th class="move-th" title="Порядок строк: перетащите строку за ⠿ или нажимайте ▲ ▼. Порядок здесь = порядок в списках у менеджера">↕</th>
                         <th style="min-width: 260px;">Название работы</th>
                         <th style="min-width: 200px;">Для групп материалов</th>
                         <th style="min-width: 150px;">Единица расчёта</th>
@@ -2956,6 +2973,23 @@ function toggleAdminFullscreen() {
 
 function updateScrollHint(scroller) {
     const wrap = scroller.parentElement;
+    // Подсказки не должны закрывать полосы прокрутки
+    const vBar = scroller.offsetWidth - scroller.clientWidth;
+    const hBar = scroller.offsetHeight - scroller.clientHeight;
+    const rightHint = wrap.querySelector('.more-hint');
+    if (rightHint) { rightHint.style.right = (1 + vBar) + 'px'; rightHint.style.bottom = (1 + hBar) + 'px'; }
+    let down = wrap.querySelector('.more-hint-down');
+    if (!down) { down = document.createElement('div'); down.className = 'more-hint-down'; down.innerHTML = '<span></span>'; wrap.appendChild(down); }
+    down.style.bottom = (1 + hBar) + 'px'; down.style.right = (1 + vBar) + 'px';
+    const moreDown = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop > 2;
+    wrap.classList.toggle('has-more-down', moreDown);
+    scroller.classList.toggle('scrolled-down', scroller.scrollTop > 1);
+    if (moreDown) {
+        const bottom = scroller.getBoundingClientRect().bottom - hBar - 2;
+        let hiddenRows = 0;
+        scroller.querySelectorAll('tbody tr').forEach(tr => { if (tr.getBoundingClientRect().bottom > bottom) hiddenRows++; });
+        down.querySelector('span').textContent = hiddenRows ? `ещё ${hiddenRows} строк ниже ↓` : 'ещё ниже ↓';
+    }
     const maxLeft = scroller.scrollWidth - scroller.clientWidth;
     const more = maxLeft - scroller.scrollLeft > 2;
     wrap.classList.toggle('has-more-right', more);
@@ -3000,6 +3034,77 @@ function setupFrozenTable(scroller) {
     updateScrollHint(scroller);
 }
 
+// --- Перестановка строк (материалы, расходники, работы) ---
+const ADMIN_LIST_RENDERERS = { materials: () => renderMaterialsTable(), consumables: () => renderConsumablesTable(), operations: () => renderOperationsTable() };
+
+function moveCellHtml(list, idx, len) {
+    return `<td class="move-cell" draggable="true" data-list="${list}" data-idx="${idx}" title="Перетащите за ⠿, чтобы поменять место, или нажмите ▲ ▼"><span class="drag-handle">⠿</span><button type="button" onclick="moveAdminRow('${list}', ${idx}, ${idx - 1})" ${idx === 0 ? 'disabled' : ''} title="Выше">▲</button><button type="button" onclick="moveAdminRow('${list}', ${idx}, ${idx + 1})" ${idx >= len - 1 ? 'disabled' : ''} title="Ниже">▼</button></td>`;
+}
+
+function moveAdminRow(list, from, to) {
+    const arr = appData[list];
+    if (!Array.isArray(arr) || from === to || from < 0 || from >= arr.length) return;
+    to = Math.max(0, Math.min(arr.length - 1, to));
+    const scroller = document.querySelector(`#adminModal .move-cell[data-list="${list}"]`)?.closest('.table-scroll');
+    const keepTop = scroller ? scroller.scrollTop : 0, keepLeft = scroller ? scroller.scrollLeft : 0;
+    const [item] = arr.splice(from, 1);
+    arr.splice(to, 0, item);
+    appData.isSavedToFile = false;
+    markPriceChanged();
+    saveAppData();
+    if (ADMIN_LIST_RENDERERS[list]) ADMIN_LIST_RENDERERS[list]();
+    if (scroller) { scroller.scrollTop = keepTop; scroller.scrollLeft = keepLeft; }
+    // Подсветить перемещённую строку
+    const cell = document.querySelector(`#adminModal .move-cell[data-list="${list}"][data-idx="${to}"]`);
+    const row = cell && cell.closest('tr');
+    if (row) { row.style.transition = 'background 1s'; row.querySelectorAll('td').forEach(td => { td.style.background = '#dbeafe'; setTimeout(() => { td.style.background = ''; }, 900); }); }
+}
+
+function bindRowDragging(tbody) {
+    if (!tbody || tbody.dataset.dragBound) return;
+    tbody.dataset.dragBound = '1';
+    let drag = null;
+    const clear = () => tbody.querySelectorAll('.drop-above, .drop-below, .dragging').forEach(tr => tr.classList.remove('drop-above', 'drop-below', 'dragging'));
+    tbody.addEventListener('dragstart', e => {
+        const cell = e.target.closest && e.target.closest('.move-cell');
+        if (!cell) { e.preventDefault(); return; }
+        drag = { list: cell.dataset.list, from: Number(cell.dataset.idx) };
+        cell.closest('tr').classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', String(drag.from)); } catch (_) {}
+    });
+    tbody.addEventListener('dragover', e => {
+        if (!drag) return;
+        const tr = e.target.closest && e.target.closest('tr');
+        if (!tr || !tr.querySelector('.move-cell')) return;
+        e.preventDefault();
+        const rect = tr.getBoundingClientRect();
+        const below = e.clientY > rect.top + rect.height / 2;
+        tbody.querySelectorAll('.drop-above, .drop-below').forEach(x => x.classList.remove('drop-above', 'drop-below'));
+        tr.classList.add(below ? 'drop-below' : 'drop-above');
+        // Автопрокрутка у краёв области таблицы
+        const sc = tbody.closest('.table-scroll');
+        if (sc) {
+            const r = sc.getBoundingClientRect();
+            if (e.clientY < r.top + 60) sc.scrollTop -= 12; else if (e.clientY > r.bottom - 40) sc.scrollTop += 12;
+        }
+    });
+    tbody.addEventListener('drop', e => {
+        if (!drag) return;
+        const tr = e.target.closest && e.target.closest('tr');
+        const cell = tr && tr.querySelector('.move-cell');
+        e.preventDefault();
+        if (cell) {
+            let to = Number(cell.dataset.idx);
+            if (tr.classList.contains('drop-below')) to += 1;
+            if (to > drag.from) to -= 1;
+            const d = drag; drag = null; clear();
+            moveAdminRow(d.list, d.from, to);
+        } else { drag = null; clear(); }
+    });
+    tbody.addEventListener('dragend', () => { drag = null; clear(); });
+}
+
 function refreshFrozenTables() {
     const modal = document.getElementById('adminModal');
     if (!modal || modal.style.display !== 'flex') return;
@@ -3015,7 +3120,7 @@ function refreshFrozenTables() {
     };
     window.addEventListener('resize', schedule);
     const start = () => {
-        document.querySelectorAll('#adminModal .table-scroll tbody').forEach(tb => new MutationObserver(schedule).observe(tb, { childList: true }));
+        document.querySelectorAll('#adminModal .table-scroll tbody').forEach(tb => { new MutationObserver(schedule).observe(tb, { childList: true }); bindRowDragging(tb); });
         let saved = false;
         try { saved = localStorage.getItem(ADMIN_FULLSCREEN_KEY) === '1'; } catch (_) {}
         applyAdminFullscreen(saved);
@@ -3054,6 +3159,7 @@ function renderMaterialsTable() {
     appData.materials.forEach((mat, idx) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
+            ${moveCellHtml('materials', idx, appData.materials.length)}
             <td><input type="text" value="${escapeHtml(mat.name)}" onchange="appData.materials[${idx}].name=this.value; appData.isSavedToFile=false; saveAppData()"></td>
             <td>
                 <select onchange="appData.materials[${idx}].group=this.value; appData.isSavedToFile=false; markPriceChanged(); renderMaterialGroupsList(); renderPositions(); saveAppData()">
@@ -3208,6 +3314,7 @@ function renderConsumablesTable() {
     const numOrEmpty = v => v === null || v === undefined ? '' : v;
     tbody.innerHTML = appData.consumables.map((c, idx) => `
         <tr style="${c.hidden ? 'opacity:0.55;' : ''}">
+            ${moveCellHtml('consumables', idx, appData.consumables.length)}
             <td><input type="text" list="consumableKindsList" value="${escapeHtml(c.kind)}" onchange="setConsumableField(${idx}, 'kind', this.value.trim())"></td>
             <td><input type="text" value="${escapeHtml(c.name)}" onchange="setConsumableField(${idx}, 'name', this.value.trim() || 'Расходник без названия')"></td>
             <td><input type="number" step="0.1" min="0" value="${numOrEmpty(c.widthMm)}" onchange="setConsumableField(${idx}, 'widthMm', this.value === '' ? null : Math.max(0, Number(this.value)))"></td>
@@ -3271,6 +3378,7 @@ function renderOperationsTable() {
         const kindKnown = !op.consumableKind || appData.consumables.some(c => normalizeKind(c.kind) === normalizeKind(op.consumableKind));
         return `
         <tr style="${op.hidden ? 'opacity:0.55;' : ''}">
+            ${moveCellHtml('operations', idx, appData.operations.length)}
             <td><input type="text" value="${escapeHtml(op.name)}" onchange="setOperationField(${idx}, 'name', this.value.trim() || 'Работа без названия')"></td>
             <td>${isOrder
                 ? '<span style="font-size:11px; color: var(--text-muted);">— услуга на весь заказ —</span>'
