@@ -123,6 +123,17 @@
         .mat-table tr.dragging td { opacity: 0.45; }
         .mat-table tr.drop-above td { box-shadow: inset 0 3px 0 var(--primary); }
         .mat-table tr.drop-below td { box-shadow: inset 0 -3px 0 var(--primary); }
+        /* Группы строк в таблицах админки */
+        .table-scroll .mat-table tr.grp-row td { background: #e8effd; padding: 5px 8px; border-bottom: 1px solid #c7d6f5; }
+        .grp-head { position: sticky; left: 8px; display: inline-flex; align-items: center; gap: 10px; }
+        .grp-toggle { border: 0; background: transparent; font-size: 14px; cursor: pointer; color: var(--primary); width: 18px; padding: 0; }
+        .grp-title { font-weight: 700; color: #1e3a8a; cursor: pointer; }
+        .grp-count { font-size: 11px; color: var(--text-muted); }
+        .grp-move button { border: 1px solid #c7d6f5; background: #fff; border-radius: 3px; font-size: 9px; padding: 2px 4px; margin-left: 2px; cursor: pointer; }
+        .grp-move button:disabled { opacity: 0.3; cursor: default; }
+        .grp-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+        .grp-tools .btn { padding: 2px 8px; font-size: 12px; }
+        .grp-tools-hint { font-size: 11px; }
         .modal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
         .modal-section { font-weight: 700; color: var(--primary); margin: 20px 0 10px 0; border-bottom: 2px solid var(--border); padding-bottom: 5px; font-size: 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 
@@ -382,6 +393,7 @@
             </div>
         </div>
 
+        <div class="grp-tools">Группы: <button type="button" class="btn btn-outline btn-sm" onclick="setAllAdminGroups('materials', true)">▸ Свернуть все</button><button type="button" class="btn btn-outline btn-sm" onclick="setAllAdminGroups('materials', false)">▾ Развернуть все</button><span class="grp-tools-hint">Порядок групп — кнопками ▲ ▼ в строке группы; строки перетаскиваются только внутри своей группы.</span></div>
         <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="2">
             <table class="mat-table">
                 <thead>
@@ -431,6 +443,7 @@
             <span>🧻 Расходники</span>
             <button class="btn btn-primary btn-sm" onclick="addConsumableRow()">➕ Добавить расходник</button>
         </div>
+        <div class="grp-tools">Группы: <button type="button" class="btn btn-outline btn-sm" onclick="setAllAdminGroups('consumables', true)">▸ Свернуть все</button><button type="button" class="btn btn-outline btn-sm" onclick="setAllAdminGroups('consumables', false)">▾ Развернуть все</button><span class="grp-tools-hint">Порядок групп — кнопками ▲ ▼ в строке группы; строки перетаскиваются только внутри своей группы.</span></div>
         <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="3">
             <table class="mat-table" style="min-width: 1500px;">
                 <thead>
@@ -469,6 +482,7 @@
             <strong>час</strong> и <strong>за заказ</strong> — услуги на весь заказ (показываются отдельным блоком под позициями).
             «Параметр» — шаг люверсов в см или количество на изделие по умолчанию. «Расход на ед.» — сколько единиц расходника уходит на единицу работы (например, 1.05 м² ламината на 1 м²).
         </p>
+        <div class="grp-tools">Группы: <button type="button" class="btn btn-outline btn-sm" onclick="setAllAdminGroups('operations', true)">▸ Свернуть все</button><button type="button" class="btn btn-outline btn-sm" onclick="setAllAdminGroups('operations', false)">▾ Развернуть все</button><span class="grp-tools-hint">Порядок групп — кнопками ▲ ▼ в строке группы; строки перетаскиваются только внутри своей группы.</span></div>
         <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="2">
             <table class="mat-table" style="min-width: 1500px;">
                 <thead>
@@ -2520,7 +2534,7 @@ function renderPositions() {
                 <div class="form-group">
                     <label>Материал:</label>
                     <select class="form-control user-editable" onchange="onMaterialChange(${pos.id}, this.value)">
-                        ${appData.materials.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === pos.materialId ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+                        ${materialOptionsHtml(pos.materialId)}
                     </select>
                 </div>
                 <div class="form-group">
@@ -3037,8 +3051,139 @@ function setupFrozenTable(scroller) {
 // --- Перестановка строк (материалы, расходники, работы) ---
 const ADMIN_LIST_RENDERERS = { materials: () => renderMaterialsTable(), consumables: () => renderConsumablesTable(), operations: () => renderOperationsTable() };
 
-function moveCellHtml(list, idx, len) {
-    return `<td class="move-cell" draggable="true" data-list="${list}" data-idx="${idx}" title="Перетащите за ⠿, чтобы поменять место, или нажмите ▲ ▼"><span class="drag-handle">⠿</span><button type="button" onclick="moveAdminRow('${list}', ${idx}, ${idx - 1})" ${idx === 0 ? 'disabled' : ''} title="Выше">▲</button><button type="button" onclick="moveAdminRow('${list}', ${idx}, ${idx + 1})" ${idx >= len - 1 ? 'disabled' : ''} title="Ниже">▼</button></td>`;
+function moveCellHtml(list, idx, nav) {
+    const prev = nav && nav.prev !== null && nav.prev !== undefined ? nav.prev : null;
+    const next = nav && nav.next !== null && nav.next !== undefined ? nav.next : null;
+    const grp = escapeHtml(String(nav ? nav.grp : ''));
+    return `<td class="move-cell" draggable="true" data-list="${list}" data-idx="${idx}" data-grp="${grp}" title="Перетащите за ⠿ внутри группы, чтобы поменять место, или нажмите ▲ ▼"><span class="drag-handle">⠿</span><button type="button" onclick="moveAdminRow('${list}', ${idx}, ${prev === null ? idx : prev})" ${prev === null ? 'disabled' : ''} title="Выше">▲</button><button type="button" onclick="moveAdminRow('${list}', ${idx}, ${next === null ? idx : next})" ${next === null ? 'disabled' : ''} title="Ниже">▼</button></td>`;
+}
+
+// --- Группировка строк в таблицах админки ---
+const ADMIN_COLLAPSE_KEY = 'mimaki-admin-collapsed-groups';
+let adminCollapsed = {};
+try { adminCollapsed = JSON.parse(localStorage.getItem(ADMIN_COLLAPSE_KEY) || '{}') || {}; } catch (_) { adminCollapsed = {}; }
+
+function operationGroupKey(op) {
+    if (getWorkUnit(op.unit).scope === 'order') return '__svc';
+    const groups = (op.groups || []).filter(g => WORK_GROUP_CODES.includes(g));
+    if (groups.length === 0) return '__all';
+    if (groups.length > 1) return '__multi';
+    return groups[0];
+}
+
+const ADMIN_GROUPING = {
+    materials: { arr: () => appData.materials, key: m => m.group || 'other', label: k => getGroupLabel(k), tbody: 'materialsTableBody', render: () => renderMaterialsTable() },
+    consumables: { arr: () => appData.consumables, key: c => normalizeKind(c.kind) || '__none', label: (k, rows) => (k === '__none' ? 'Без вида' : (rows[0] && rows[0].item.kind) || k), tbody: 'consumablesTableBody', render: () => renderConsumablesTable() },
+    operations: { arr: () => appData.operations, key: operationGroupKey,
+        label: k => ({ __svc: 'Услуги на весь заказ', __all: 'Для всех материалов (группы не отмечены)', __multi: 'Для нескольких групп материалов' }[k] || ('Для группы «' + getGroupLabel(k) + '»')),
+        tbody: 'operationsTableBody', render: () => renderOperationsTable() }
+};
+
+function adminGroups(list) {
+    const cfg = ADMIN_GROUPING[list];
+    const map = new Map();
+    cfg.arr().forEach((item, idx) => {
+        const k = String(cfg.key(item));
+        if (!map.has(k)) map.set(k, []);
+        map.get(k).push({ item, idx });
+    });
+    return [...map.entries()].map(([key, rows]) => ({ key, rows, label: cfg.label(key, rows) }));
+}
+
+function isAdminGroupCollapsed(list, key) {
+    return Array.isArray(adminCollapsed[list]) && adminCollapsed[list].includes(key);
+}
+
+function saveAdminCollapsed() {
+    try { localStorage.setItem(ADMIN_COLLAPSE_KEY, JSON.stringify(adminCollapsed)); } catch (_) {}
+}
+
+function adminColspan(list) {
+    const tb = document.getElementById(ADMIN_GROUPING[list].tbody);
+    const table = tb && tb.closest('table');
+    return table ? table.querySelectorAll('thead tr:first-child th').length : 1;
+}
+
+function groupHeaderHtml(list, g, gi, total, colspan) {
+    const collapsed = isAdminGroupCollapsed(list, g.key);
+    return `<tr class="grp-row${collapsed ? ' collapsed' : ''}" data-list="${list}" data-key="${escapeHtml(g.key)}"><td colspan="${colspan}"><div class="grp-head">
+        <button type="button" class="grp-toggle" onclick="toggleAdminGroup(this)" title="${collapsed ? 'Развернуть группу' : 'Свернуть группу'}">${collapsed ? '▸' : '▾'}</button>
+        <span class="grp-title" onclick="toggleAdminGroup(this)">${escapeHtml(g.label)}</span>
+        <span class="grp-count">${g.rows.length} шт.${collapsed ? ' — свёрнуто' : ''}</span>
+        <span class="grp-move"><button type="button" onclick="moveAdminGroup(this, -1)" ${gi === 0 ? 'disabled' : ''} title="Вся группа выше">▲</button><button type="button" onclick="moveAdminGroup(this, 1)" ${gi === total - 1 ? 'disabled' : ''} title="Вся группа ниже">▼</button></span>
+    </div></td></tr>`;
+}
+
+function groupNav(g, i) {
+    return { prev: i > 0 ? g.rows[i - 1].idx : null, next: i < g.rows.length - 1 ? g.rows[i + 1].idx : null, grp: g.key };
+}
+
+function groupedRowsHtml(list, rowFn) {
+    const groups = adminGroups(list);
+    const colspan = adminColspan(list);
+    return groups.map((g, gi) => groupHeaderHtml(list, g, gi, groups.length, colspan)
+        + (isAdminGroupCollapsed(list, g.key) ? '' : g.rows.map((r, i) => rowFn(r.item, r.idx, groupNav(g, i))).join(''))).join('');
+}
+
+function forEachGroupedRow(list, tbody, rowFn) {
+    const groups = adminGroups(list);
+    const colspan = adminColspan(list);
+    groups.forEach((g, gi) => {
+        tbody.insertAdjacentHTML('beforeend', groupHeaderHtml(list, g, gi, groups.length, colspan));
+        if (!isAdminGroupCollapsed(list, g.key)) g.rows.forEach((r, i) => rowFn(r.item, r.idx, groupNav(g, i)));
+    });
+}
+
+function toggleAdminGroup(el) {
+    const tr = el.closest('tr');
+    const list = tr.dataset.list, key = tr.dataset.key;
+    const set = new Set(adminCollapsed[list] || []);
+    if (set.has(key)) set.delete(key); else set.add(key);
+    adminCollapsed[list] = [...set];
+    saveAdminCollapsed();
+    ADMIN_GROUPING[list].render();
+}
+
+function setAllAdminGroups(list, collapse) {
+    adminCollapsed[list] = collapse ? adminGroups(list).map(g => g.key) : [];
+    saveAdminCollapsed();
+    ADMIN_GROUPING[list].render();
+}
+
+function moveAdminGroup(el, dir) {
+    const tr = el.closest('tr');
+    const list = tr.dataset.list, key = tr.dataset.key;
+    const groups = adminGroups(list);
+    const i = groups.findIndex(g => g.key === key), j = i + dir;
+    if (i < 0 || j < 0 || j >= groups.length) return;
+    [groups[i], groups[j]] = [groups[j], groups[i]];
+    appData[list] = groups.flatMap(g => g.rows.map(r => r.item));
+    appData.isSavedToFile = false;
+    markPriceChanged();
+    saveAppData();
+    ADMIN_GROUPING[list].render();
+    if (list !== 'materials') renderPositions();
+}
+
+// Смена группы материала: строка переезжает в конец своей новой группы,
+// порядок самих групп при этом не меняется.
+function changeMaterialGroup(idx, group) {
+    const arr = appData.materials;
+    const mat = arr[idx];
+    if (!mat) return;
+    arr.splice(idx, 1);
+    mat.group = group;
+    let lastOfGroup = -1;
+    arr.forEach((m, i) => { if (m.group === group) lastOfGroup = i; });
+    arr.splice(lastOfGroup >= 0 ? lastOfGroup + 1 : arr.length, 0, mat);
+    appData.isSavedToFile = false;
+    markPriceChanged();
+    renderMaterialGroupsList(); renderMaterialsTable(); renderPositions(); saveAppData();
+}
+
+// Выпадающий список материалов у менеджера — по группам, в порядке из админки
+function materialOptionsHtml(selectedId) {
+    return adminGroups('materials').map(g => `<optgroup label="${escapeHtml(g.label)}">${g.rows.map(({ item: m }) => `<option value="${escapeHtml(m.id)}" ${m.id === selectedId ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}</optgroup>`).join('');
 }
 
 function moveAdminRow(list, from, to) {
@@ -3068,7 +3213,7 @@ function bindRowDragging(tbody) {
     tbody.addEventListener('dragstart', e => {
         const cell = e.target.closest && e.target.closest('.move-cell');
         if (!cell) { e.preventDefault(); return; }
-        drag = { list: cell.dataset.list, from: Number(cell.dataset.idx) };
+        drag = { list: cell.dataset.list, from: Number(cell.dataset.idx), grp: cell.dataset.grp };
         cell.closest('tr').classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         try { e.dataTransfer.setData('text/plain', String(drag.from)); } catch (_) {}
@@ -3076,7 +3221,8 @@ function bindRowDragging(tbody) {
     tbody.addEventListener('dragover', e => {
         if (!drag) return;
         const tr = e.target.closest && e.target.closest('tr');
-        if (!tr || !tr.querySelector('.move-cell')) return;
+        const overCell = tr && tr.querySelector('.move-cell');
+        if (!overCell || overCell.dataset.grp !== drag.grp) { tbody.querySelectorAll('.drop-above, .drop-below').forEach(x => x.classList.remove('drop-above', 'drop-below')); return; }
         e.preventDefault();
         const rect = tr.getBoundingClientRect();
         const below = e.clientY > rect.top + rect.height / 2;
@@ -3094,7 +3240,7 @@ function bindRowDragging(tbody) {
         const tr = e.target.closest && e.target.closest('tr');
         const cell = tr && tr.querySelector('.move-cell');
         e.preventDefault();
-        if (cell) {
+        if (cell && cell.dataset.grp === drag.grp) {
             let to = Number(cell.dataset.idx);
             if (tr.classList.contains('drop-below')) to += 1;
             if (to > drag.from) to -= 1;
@@ -3156,13 +3302,13 @@ function updateAdminConfig() {
 function renderMaterialsTable() {
     const tbody = document.getElementById('materialsTableBody');
     tbody.innerHTML = '';
-    appData.materials.forEach((mat, idx) => {
+    forEachGroupedRow('materials', tbody, (mat, idx, nav) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            ${moveCellHtml('materials', idx, appData.materials.length)}
+            ${moveCellHtml('materials', idx, nav)}
             <td><input type="text" value="${escapeHtml(mat.name)}" onchange="appData.materials[${idx}].name=this.value; appData.isSavedToFile=false; saveAppData()"></td>
             <td>
-                <select onchange="appData.materials[${idx}].group=this.value; appData.isSavedToFile=false; markPriceChanged(); renderMaterialGroupsList(); renderPositions(); saveAppData()">
+                <select onchange="changeMaterialGroup(${idx}, this.value)">
                     ${MATERIAL_GROUPS.map(g => `<option value="${g.code}" ${mat.group === g.code ? 'selected' : ''}>${escapeHtml(g.label)}</option>`).join('')}
                 </select>
             </td>
@@ -3312,9 +3458,9 @@ function renderConsumablesTable() {
     const kinds = [...new Set([...appData.consumables.map(c => c.kind), ...appData.operations.map(o => o.consumableKind)].filter(Boolean))];
     document.getElementById('consumableKindsList').innerHTML = kinds.map(k => `<option value="${escapeHtml(k)}"></option>`).join('');
     const numOrEmpty = v => v === null || v === undefined ? '' : v;
-    tbody.innerHTML = appData.consumables.map((c, idx) => `
+    tbody.innerHTML = groupedRowsHtml('consumables', (c, idx, nav) => `
         <tr style="${c.hidden ? 'opacity:0.55;' : ''}">
-            ${moveCellHtml('consumables', idx, appData.consumables.length)}
+            ${moveCellHtml('consumables', idx, nav)}
             <td><input type="text" list="consumableKindsList" value="${escapeHtml(c.kind)}" onchange="setConsumableField(${idx}, 'kind', this.value.trim())"></td>
             <td><input type="text" value="${escapeHtml(c.name)}" onchange="setConsumableField(${idx}, 'name', this.value.trim() || 'Расходник без названия')"></td>
             <td><input type="number" step="0.1" min="0" value="${numOrEmpty(c.widthMm)}" onchange="setConsumableField(${idx}, 'widthMm', this.value === '' ? null : Math.max(0, Number(this.value)))"></td>
@@ -3335,7 +3481,7 @@ function renderConsumablesTable() {
             <td style="text-align:center;"><input type="checkbox" ${c.inStock ? 'checked' : ''} onchange="setConsumableField(${idx}, 'inStock', this.checked)"></td>
             <td style="text-align:center;"><input type="checkbox" ${c.hidden ? 'checked' : ''} onchange="setConsumableField(${idx}, 'hidden', this.checked)"></td>
             <td><button class="btn btn-danger btn-sm" onclick="removeConsumableRow(${idx})">🗑</button></td>
-        </tr>`).join('');
+        </tr>`);
 }
 
 function addConsumableRow() {
@@ -3372,13 +3518,13 @@ function toggleOperationGroup(idx, groupCode, checked) {
 function renderOperationsTable() {
     const tbody = document.getElementById('operationsTableBody');
     if (!tbody) return;
-    tbody.innerHTML = appData.operations.map((op, idx) => {
+    tbody.innerHTML = groupedRowsHtml('operations', (op, idx, nav) => {
         const unit = getWorkUnit(op.unit);
         const isOrder = unit.scope === 'order';
         const kindKnown = !op.consumableKind || appData.consumables.some(c => normalizeKind(c.kind) === normalizeKind(op.consumableKind));
         return `
         <tr style="${op.hidden ? 'opacity:0.55;' : ''}">
-            ${moveCellHtml('operations', idx, appData.operations.length)}
+            ${moveCellHtml('operations', idx, nav)}
             <td><input type="text" value="${escapeHtml(op.name)}" onchange="setOperationField(${idx}, 'name', this.value.trim() || 'Работа без названия')"></td>
             <td>${isOrder
                 ? '<span style="font-size:11px; color: var(--text-muted);">— услуга на весь заказ —</span>'
@@ -3398,7 +3544,7 @@ function renderOperationsTable() {
             <td style="text-align:center;"><input type="checkbox" ${op.hidden ? 'checked' : ''} onchange="setOperationField(${idx}, 'hidden', this.checked)"></td>
             <td><button class="btn btn-danger btn-sm" onclick="removeOperationRow(${idx})">🗑</button></td>
         </tr>`;
-    }).join('');
+    });
 }
 
 function addOperationRow() {
