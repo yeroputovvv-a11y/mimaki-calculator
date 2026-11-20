@@ -91,6 +91,24 @@
         .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
         .modal-content { background: #fff; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; border-radius: 12px; padding: 25px; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; }
+        /* Админка: шапка с кнопками всегда видна, окно можно развернуть на весь экран */
+        #adminModal .modal-header { position: sticky; top: -25px; background: #fff; z-index: 20; padding-top: 10px; margin-top: -10px; gap: 10px; }
+        #adminModal .modal-header-actions { display: flex; gap: 8px; align-items: center; }
+        #adminModal .modal-content.fullscreen { width: 100vw; max-width: none; height: 100vh; max-height: 100vh; border-radius: 0; }
+        /* Широкие таблицы админки: первый столбец (название) заморожен, справа видно, что есть ещё столбцы */
+        .table-scroll-wrap { position: relative; margin-top: 10px; }
+        .table-scroll { overflow: auto; max-height: 70vh; border: 1px solid var(--border); border-radius: 6px; }
+        #adminModal .modal-content.fullscreen .table-scroll { max-height: 78vh; }
+        .table-scroll .mat-table { margin-top: 0; border-collapse: separate; border-spacing: 0; }
+        .table-scroll .mat-table th, .table-scroll .mat-table td { border: 0; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); background-clip: padding-box; }
+        .table-scroll .mat-table thead th { position: sticky; top: 0; z-index: 3; }
+        .table-scroll .mat-table td { background: #fff; }
+        .table-scroll .mat-table .frz { position: sticky; z-index: 2; }
+        .table-scroll .mat-table thead th.frz { z-index: 4; }
+        .table-scroll.scrolled .mat-table .frz-last { box-shadow: 6px 0 6px -4px rgba(15, 23, 42, 0.35); border-right: 2px solid #94a3b8; }
+        .more-hint { display: none; position: absolute; top: 1px; right: 1px; bottom: 1px; width: 70px; pointer-events: none; background: linear-gradient(to right, rgba(255,255,255,0), rgba(37,99,235,0.18)); border-radius: 0 6px 6px 0; z-index: 6; }
+        .more-hint span { position: sticky; top: 40px; display: block; margin: 40px 4px 0 auto; width: max-content; max-width: 66px; background: var(--primary); color: #fff; font-size: 11px; font-weight: 600; line-height: 1.2; padding: 4px 6px; border-radius: 10px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.25); }
+        .table-scroll-wrap.has-more-right .more-hint { display: block; }
         .modal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
         .modal-section { font-weight: 700; color: var(--primary); margin: 20px 0 10px 0; border-bottom: 2px solid var(--border); padding-bottom: 5px; font-size: 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 
@@ -242,7 +260,10 @@
     <div class="modal-content">
         <div class="modal-header">
             <h2>Панель администратора (Настройки и База)</h2>
-            <button class="btn btn-outline" onclick="closeAdminModal()">✕</button>
+            <div class="modal-header-actions">
+                <button class="btn btn-outline" id="adminFullscreenBtn" onclick="toggleAdminFullscreen()" title="Развернуть окно на весь экран / вернуть обычный размер">⛶ На весь экран</button>
+                <button class="btn btn-outline" onclick="closeAdminModal()">✕</button>
+            </div>
         </div>
 
         <div class="modal-section">1. Валюта, Энергетика и Базовые расходы</div>
@@ -289,7 +310,7 @@
             <button class="btn btn-primary btn-sm" onclick="addNewPrintMode()">➕ Новый режим</button>
         </div>
         <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">* Скорость и расход чернил для заводских режимов — справочные значения производителя; здесь их можно откалибровать по реальным замерам, с возможностью отката к заводским по каждому режиму. Кастомные режимы создаются с нуля и удаляются кнопкой 🗑.</p>
-        <div style="overflow-x: auto;">
+        <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="1">
             <table class="mat-table">
                 <thead>
                     <tr>
@@ -303,6 +324,8 @@
                 </thead>
                 <tbody id="printModesTableBody"></tbody>
             </table>
+            </div>
+            <div class="more-hint"><span></span></div>
         </div>
 
         <div class="modal-grid" style="margin-top: 15px;">
@@ -345,7 +368,7 @@
             </div>
         </div>
 
-        <div style="overflow-x: auto;">
+        <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="1">
             <table class="mat-table">
                 <thead>
                     <tr>
@@ -365,6 +388,8 @@
                 </thead>
                 <tbody id="materialsTableBody"></tbody>
             </table>
+            </div>
+            <div class="more-hint"><span></span></div>
         </div>
 
         <div class="modal-section" style="margin-top: 30px;">
@@ -391,7 +416,7 @@
             <span>🧻 Расходники</span>
             <button class="btn btn-primary btn-sm" onclick="addConsumableRow()">➕ Добавить расходник</button>
         </div>
-        <div style="overflow-x: auto;">
+        <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="2">
             <table class="mat-table" style="min-width: 1500px;">
                 <thead>
                     <tr>
@@ -413,6 +438,8 @@
                 </thead>
                 <tbody id="consumablesTableBody"></tbody>
             </table>
+            </div>
+            <div class="more-hint"><span></span></div>
         </div>
         <datalist id="consumableKindsList"></datalist>
 
@@ -426,7 +453,7 @@
             <strong>час</strong> и <strong>за заказ</strong> — услуги на весь заказ (показываются отдельным блоком под позициями).
             «Параметр» — шаг люверсов в см или количество на изделие по умолчанию. «Расход на ед.» — сколько единиц расходника уходит на единицу работы (например, 1.05 м² ламината на 1 м²).
         </p>
-        <div style="overflow-x: auto;">
+        <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="1">
             <table class="mat-table" style="min-width: 1500px;">
                 <thead>
                     <tr>
@@ -446,6 +473,8 @@
                 </thead>
                 <tbody id="operationsTableBody"></tbody>
             </table>
+            </div>
+            <div class="more-hint"><span></span></div>
         </div>
 
         <div class="modal-section" style="margin-top: 30px;">☁️ 6. Google Drive: общий прайс</div>
@@ -2898,12 +2927,101 @@ function reallyOpenAdminModal() {
     renderConsumablesTable();
     renderOperationsTable();
     document.getElementById('adminModal').style.display = 'flex';
+    requestAnimationFrame(refreshFrozenTables);
 }
 
 function closeAdminModal() {
     document.getElementById('adminModal').style.display = 'none';
     renderPositions(); saveAppData();
 }
+
+// --- Широкие таблицы админки: заморозка первых столбцов и подсказка «ещё столбцы →» ---
+const ADMIN_FULLSCREEN_KEY = 'mimaki-admin-fullscreen';
+
+function applyAdminFullscreen(on) {
+    const content = document.querySelector('#adminModal .modal-content');
+    if (!content) return;
+    content.classList.toggle('fullscreen', on);
+    const btn = document.getElementById('adminFullscreenBtn');
+    if (btn) btn.textContent = on ? '🗗 Обычный размер' : '⛶ На весь экран';
+    requestAnimationFrame(refreshFrozenTables);
+}
+
+function toggleAdminFullscreen() {
+    const content = document.querySelector('#adminModal .modal-content');
+    const on = !(content && content.classList.contains('fullscreen'));
+    try { localStorage.setItem(ADMIN_FULLSCREEN_KEY, on ? '1' : '0'); } catch (_) {}
+    applyAdminFullscreen(on);
+}
+
+function updateScrollHint(scroller) {
+    const wrap = scroller.parentElement;
+    const maxLeft = scroller.scrollWidth - scroller.clientWidth;
+    const more = maxLeft - scroller.scrollLeft > 2;
+    wrap.classList.toggle('has-more-right', more);
+    scroller.classList.toggle('scrolled', scroller.scrollLeft > 1);
+    if (!more) return;
+    // Сколько столбцов справа не видно целиком
+    const ths = scroller.querySelectorAll('thead tr:first-child th');
+    const right = scroller.getBoundingClientRect().right - 2;
+    let hidden = 0;
+    ths.forEach(th => { if (th.getBoundingClientRect().right > right) hidden++; });
+    const label = wrap.querySelector('.more-hint span');
+    if (label) label.textContent = hidden ? `ещё ${hidden} стб. →` : 'ещё →';
+}
+
+function setupFrozenTable(scroller) {
+    const table = scroller.querySelector('table');
+    if (!table) return;
+    const n = Math.max(0, Number(scroller.dataset.freeze) || 0);
+    const headCells = table.querySelectorAll('thead tr:first-child th');
+    const lefts = [];
+    let acc = 0;
+    for (let i = 0; i < n && i < headCells.length; i++) { lefts.push(acc); acc += headCells[i].offsetWidth; }
+    table.querySelectorAll('tr').forEach(tr => {
+        const cells = tr.children;
+        if (cells.length < 2) return; // строки-сообщения на всю ширину не трогаем
+        for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i];
+            if (i < lefts.length) {
+                cell.classList.add('frz');
+                cell.classList.toggle('frz-last', i === lefts.length - 1);
+                cell.style.left = lefts[i] + 'px';
+            } else if (cell.classList.contains('frz')) {
+                cell.classList.remove('frz', 'frz-last');
+                cell.style.left = '';
+            }
+        }
+    });
+    if (!scroller.dataset.hintBound) {
+        scroller.dataset.hintBound = '1';
+        scroller.addEventListener('scroll', () => updateScrollHint(scroller), { passive: true });
+    }
+    updateScrollHint(scroller);
+}
+
+function refreshFrozenTables() {
+    const modal = document.getElementById('adminModal');
+    if (!modal || modal.style.display !== 'flex') return;
+    modal.querySelectorAll('.table-scroll').forEach(setupFrozenTable);
+}
+
+(function initFrozenTables() {
+    let scheduled = false;
+    const schedule = () => {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(() => { scheduled = false; refreshFrozenTables(); });
+    };
+    window.addEventListener('resize', schedule);
+    const start = () => {
+        document.querySelectorAll('#adminModal .table-scroll tbody').forEach(tb => new MutationObserver(schedule).observe(tb, { childList: true }));
+        let saved = false;
+        try { saved = localStorage.getItem(ADMIN_FULLSCREEN_KEY) === '1'; } catch (_) {}
+        applyAdminFullscreen(saved);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
 
 function updateAdminConfig() {
     const c = appData.config;
