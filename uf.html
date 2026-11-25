@@ -772,6 +772,7 @@ function persistPriceBase() {
         localStorage.setItem(PRICE_BASE_KEY, JSON.stringify({
             fileId: googleDriveSettings.priceFileId || '',
             version: driveState.priceVersion,
+            updatedAt: driveState.priceUpdatedAt || null,
             dirty: Boolean(driveState.priceDirty)
         }));
     } catch (_) { /* хранилище недоступно — работаем как раньше */ }
@@ -782,6 +783,7 @@ function persistPriceBase() {
         const saved = JSON.parse(localStorage.getItem(PRICE_BASE_KEY) || 'null');
         if (saved && saved.fileId && saved.fileId === googleDriveSettings.priceFileId) {
             driveState.priceVersion = saved.version || null;
+            driveState.priceUpdatedAt = saved.updatedAt || null;
             driveState.priceDirty = Boolean(saved.dirty);
         }
     } catch (_) { /* нет сохранённых данных */ }
@@ -1481,6 +1483,7 @@ async function loadPriceFromDrive(options = {}) {
         const remote = await readDriveJson(googleDriveSettings.priceFileId);
         applyPriceSnapshot(remote.data);
         driveState.priceVersion = remote.metadata.version;
+        driveState.priceUpdatedAt = remote.data && remote.data.updatedAt || null;
         driveState.priceEtag = remote.etag;
         driveState.priceDirty = false;
         persistPriceBase();
@@ -1520,12 +1523,29 @@ async function publishPriceToDrive() {
             const metaResponse = await driveFetch(`${GOOGLE_DRIVE_API}/files/${encodeURIComponent(googleDriveSettings.priceFileId)}?fields=version`);
             const meta = await metaResponse.json();
             if (String(meta.version) !== String(driveState.priceVersion)) {
-                const conflict = new Error('version mismatch');
-                conflict.status = 412;
-                throw conflict;
+                // Google Drive иногда увеличивает номер версии уже ПОСЛЕ нашей записи, и
+                // повторная публикация ложно считала, что файл изменил коллега. Проверяем
+                // по содержимому: если в файле наша же последняя версия (та же отметка
+                // времени updatedAt) — конфликта нет. Иначе показываем, кто и когда менял,
+                // и спрашиваем.
+                const remote = await readDriveJson(googleDriveSettings.priceFileId);
+                const ours = driveState.priceUpdatedAt && remote.data && remote.data.updatedAt === driveState.priceUpdatedAt;
+                if (!ours) {
+                    const infoResp = await driveFetch(`${GOOGLE_DRIVE_API}/files/${encodeURIComponent(googleDriveSettings.priceFileId)}?fields=modifiedTime,lastModifyingUser(displayName,me)`);
+                    const info = await infoResp.json();
+                    const who = info.lastModifyingUser ? (info.lastModifyingUser.me ? 'вы (этот же аккаунт Google)' : info.lastModifyingUser.displayName) : 'неизвестно';
+                    const when = info.modifiedTime ? new Date(info.modifiedTime).toLocaleString('ru-RU') : '';
+                    if (!confirm(`Прайс на Drive изменён после того, как вы его загрузили в этой вкладке.\n\nПоследнее изменение: ${when}, ${who}.\n\nОК — всё равно опубликовать вашу версию (если это были вы сами: другая вкладка, другой компьютер или предыдущая публикация).\nОтмена — не публиковать; потом «↻ Обновить прайс» и внести правки заново.`)) {
+                        const conflict = new Error('version mismatch');
+                        conflict.status = 412;
+                        throw conflict;
+                    }
+                }
             }
         }
-        const result = await updateDriveJson(googleDriveSettings.priceFileId, buildPriceSnapshot(), driveState.priceEtag);
+        const snapshot = buildPriceSnapshot();
+        const result = await updateDriveJson(googleDriveSettings.priceFileId, snapshot, driveState.priceEtag);
+        driveState.priceUpdatedAt = snapshot.updatedAt;
         driveState.priceVersion = result.metadata.version;
         driveState.priceEtag = result.etag;
         driveState.priceDirty = false;
@@ -1534,7 +1554,7 @@ async function publishPriceToDrive() {
     } catch (error) {
         if (error.status === 412) {
             setCloudStatus('прайс изменён коллегой — загрузите новую версию', 'warning');
-            alert('Прайс был изменён другим сотрудником. Ваша версия не сохранена, чтобы не затереть его данные. Загрузите актуальный прайс и внесите изменения повторно.');
+            alert('Публикация отменена, ваша версия не сохранена на Drive (правки остались в этом браузере). Чтобы взять версию с Drive — «↻ Обновить прайс» и внести изменения повторно.');
         } else {
             setCloudStatus('не удалось опубликовать прайс', 'error');
             alert(`Не удалось опубликовать прайс: ${error.message}`);
