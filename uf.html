@@ -63,6 +63,14 @@
         .size-group-title { font-size: 11px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; }
         .size-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .duplex-group { grid-column: 1 / -1 !important; }
+        .link-group { border: 2px solid #0ea5e9; border-radius: 14px; padding: 14px 14px 2px; margin-bottom: 22px; background: #f0f9ff; }
+        .link-group > .position-card { margin-bottom: 12px; border-left: 4px solid #0ea5e9; }
+        .link-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
+        .link-head .form-group { margin: 0; }
+        .link-head .form-control { padding: 6px 8px; }
+        .link-title { font-size: 17px; font-weight: 700; color: #0369a1; }
+        .link-total { margin-left: auto; text-align: right; font-weight: 700; font-size: 18px; color: #0369a1; }
+        .link-total small { display: block; font-weight: 400; font-size: 12px; color: var(--text-muted); }
         .duplex-group .size-inputs { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
         
         @media (max-width: 768px) {
@@ -222,7 +230,7 @@
 
     <div class="toolbar">
         <div class="group">
-            <button class="btn btn-primary" onclick="addPosition()">➕ Добавить позицию</button>
+            <button class="btn btn-primary" onclick="openAddPositionChoice()">➕ Добавить позицию</button>
             <button class="btn btn-outline" style="border-color: var(--primary); color: var(--primary);" onclick="openTemplatePicker()" title="Добавить готовую типовую позицию (А2 на картоне, ручки, ХДФ…) — останется ввести тираж">📋 Типовая позиция</button>
             <button class="btn btn-outline" style="border-color: var(--danger); color: var(--danger);" onclick="startNewOrder()" title="Очистить все позиции и начать новый расчет">🆕 Новый заказ</button>
             
@@ -605,6 +613,18 @@
 
 <div id="printClientDiv"></div>
 
+<!-- Добавление: отдельная позиция или связанная -->
+<div class="modal" id="addChoiceModal">
+    <div class="modal-content" style="max-width: 560px;">
+        <div class="modal-header">
+            <h2 id="addChoiceTitle">Новая позиция</h2>
+            <button class="btn btn-outline" onclick="document.getElementById('addChoiceModal').style.display='none'">✕</button>
+        </div>
+        <div id="addChoiceList"></div>
+        <p style="font-size:12px; color:var(--text-muted); margin-top:10px;">Связанные позиции — одно изделие (например, плёнка с печатью + ПВХ без печати с прикаткой и порезкой = табличка). У изделия общий номер, размер, тираж, уровень цен, срок и скидка. Отвязать позицию можно кнопкой «✂️ Отвязать».</p>
+    </div>
+</div>
+
 <!-- Выбор типовой позиции (шаблона) -->
 <div class="modal" id="templatePickerModal">
     <div class="modal-content" style="max-width: 760px;">
@@ -861,6 +881,10 @@ function normalizePosition(raw, index = 0) {
         duplexCutOpId: typeof source.duplexCutOpId === 'string' ? source.duplexCutOpId : '',
         templateId: typeof source.templateId === 'string' ? source.templateId : '',
         templateName: typeof source.templateName === 'string' ? source.templateName : '',
+        // Связанные позиции (изделие из нескольких позиций, напр. плёнка + ПВХ = табличка):
+        // одинаковый linkId, название изделия — linkName (одинаковое у всех).
+        linkId: typeof source.linkId === 'string' ? source.linkId : '',
+        linkName: typeof source.linkName === 'string' ? source.linkName : '',
         urgency: ['standard', '24h', 'same_day'].includes(source.urgency) ? source.urgency : 'standard',
         discountPercent: Math.min(100, validNumber(source.discountPercent, 0, 0)),
         discountNote: typeof source.discountNote === 'string' ? source.discountNote : '',
@@ -2459,20 +2483,34 @@ function duplexBlockHtml(pos, calc) {
 // --- Типовые позиции (шаблоны) ---
 function normalizeTemplates(list) {
     if (!Array.isArray(list)) return [];
-    return list.filter(t => t && typeof t === 'object' && t.position && typeof t.position === 'object').map((t, i) => ({
-        id: typeof t.id === 'string' && t.id ? t.id : `tpl_${Date.now()}_${i}`,
-        name: typeof t.name === 'string' && t.name.trim() ? t.name.trim() : 'Без названия',
-        section: typeof t.section === 'string' ? t.section.trim() : '',
-        position: t.position
-    }));
+    // Типовая бывает одной позицией (position) или изделием из нескольких связанных (item.positions).
+    return list.filter(t => t && typeof t === 'object' && ((t.position && typeof t.position === 'object') || (t.item && Array.isArray(t.item.positions) && t.item.positions.length))).map((t, i) => {
+        const base = {
+            id: typeof t.id === 'string' && t.id ? t.id : `tpl_${Date.now()}_${i}`,
+            name: typeof t.name === 'string' && t.name.trim() ? t.name.trim() : 'Без названия',
+            section: typeof t.section === 'string' ? t.section.trim() : ''
+        };
+        if (t.item && Array.isArray(t.item.positions) && t.item.positions.length) return { ...base, item: { positions: t.item.positions } };
+        return { ...base, position: t.position };
+    });
 }
 function templateFromPosition(pos) {
     const copy = JSON.parse(JSON.stringify(pos));
-    delete copy.id; delete copy.templateId; delete copy.templateName;
+    delete copy.id; delete copy.templateId; delete copy.templateName; delete copy.linkId; delete copy.linkName;
     copy.discountPercent = 0; copy.discountNote = '';
     return copy;
 }
 function templateSummary(t) {
+    if (t.item) {
+        const ps = t.item.positions;
+        const f = ps[0] || {};
+        const parts = ps.map(p => {
+            const mat = appData.materials.find(m => m.id === p.materialId);
+            const works = (p.works || []).map(w => findOperation(w.opId)).filter(Boolean).map(op => op.name);
+            return `${mat ? mat.name : '⚠️ материал удалён'}${p.noPrint ? ' (без печати)' : ''}${works.length ? ' + ' + works.join(', ') : ''}`;
+        });
+        return `🔗 изделие ${f.matWidthM}×${f.matHeightM} м, тираж ${f.quantity || 1}: ` + parts.join(' | ');
+    }
     const p = t.position || {};
     const mat = appData.materials.find(m => m.id === p.materialId);
     const parts = [];
@@ -2512,7 +2550,33 @@ function savePositionAsTemplate(posId) {
     renderPositions(); saveAppData();
     alert('Сохранено в типовые позиции.\n\nЧтобы она сохранилась в тестовом прайсе на Drive, откройте Админку и нажмите «☁️ Опубликовать прайс».');
 }
-function openTemplatePicker() {
+function saveLinkAsTemplate(linkId) {
+    const members = linkMembers(linkId);
+    if (!members.length) return;
+    appData.positionTemplates = appData.positionTemplates || [];
+    const existingId = members[0].templateId && members.every(p => p.templateId === members[0].templateId) ? members[0].templateId : '';
+    const existing = existingId ? appData.positionTemplates.find(t => t.id === existingId && t.item) : null;
+    const positions = members.map(templateFromPosition);
+    let tplName;
+    if (existing && confirm(`Обновить типовое изделие «${existing.name}» текущими позициями?\n\nОК — обновить\nОтмена — сохранить как новое`)) {
+        existing.item = { positions };
+        tplName = existing.name;
+    } else {
+        const name = prompt('Название типового изделия (например «Табличка ПВХ 3 мм с плёнкой»):', members[0].linkName || 'Табличка');
+        if (!name || !name.trim()) return;
+        const section = prompt('Раздел (необязательно), например «Таблички», «Стенды»:', existing ? existing.section : '') || '';
+        const t = { id: `tpl_${Date.now()}`, name: name.trim(), section: section.trim(), item: { positions } };
+        appData.positionTemplates.push(t);
+        members.forEach(p => { p.templateId = t.id; p.templateName = ''; if (!p.linkName) p.linkName = t.name; });
+        tplName = t.name;
+    }
+    markPriceChanged();
+    renderPositions(); saveAppData();
+    alert(`Изделие «${tplName}» сохранено в типовые.\n\nЧтобы оно сохранилось в тестовом прайсе на Drive, откройте Админку и нажмите «☁️ Опубликовать прайс».`);
+}
+let templatePickerTarget = null;
+function openTemplatePicker(targetPosId = null) {
+    templatePickerTarget = targetPosId;
     document.getElementById('templateSearch').value = '';
     renderTemplatePicker();
     document.getElementById('templatePickerModal').style.display = 'flex';
@@ -2543,22 +2607,40 @@ function renderTemplatePicker() {
             </div>`).join('')}
     `).join('');
 }
-function addPositionFromTemplate(tplId) {
+// targetId — позиция, с которой связать (null — отдельно); decided — выбор уже сделан.
+function addPositionFromTemplate(tplId, targetId = null, decided = false) {
     const t = (appData.positionTemplates || []).find(x => x.id === tplId);
     if (!t) return;
-    const raw = JSON.parse(JSON.stringify(t.position));
-    raw.id = Date.now() + Math.floor(Math.random() * 1000);
-    const pos = normalizePosition(raw);
-    pos.templateId = t.id;
-    pos.templateName = t.name;
-    const matOk = appData.materials.some(m => m.id === pos.materialId);
-    appData.positions.push(pos);
-    appData.isSavedToFile = false;
     closeTemplatePicker();
+    if (!decided) {
+        if (templatePickerTarget !== null) { targetId = templatePickerTarget; }
+        else if (appData.positions.length) { pendingTemplateAdd = tplId; renderAddChoice(`Типовая: ${t.name}`); return; }
+    }
+    const rawList = t.item ? t.item.positions : [t.position];
+    const created = rawList.map((rp, i) => {
+        const raw = JSON.parse(JSON.stringify(rp));
+        raw.id = Date.now() + i * 7 + Math.floor(Math.random() * 1000);
+        const pos = normalizePosition(raw);
+        pos.templateId = t.id;
+        pos.templateName = t.item ? '' : t.name;
+        pos.linkId = ''; pos.linkName = '';
+        return pos;
+    });
+    if (t.item && created.length > 1) {
+        const lid = newLinkId();
+        created.forEach(p => { p.linkId = lid; p.linkName = t.name; });
+    }
+    const matOk = created.every(pos => appData.materials.some(m => m.id === pos.materialId));
+    appData.positions.push(...created);
+    if (targetId !== null && targetId !== undefined) {
+        // В изделие целевой позиции; общие параметры (размер, тираж…) — от изделия.
+        created.forEach(pos => attachToLink(pos, Number(targetId), true));
+    }
+    lastAddedPositionId = created[0].id;
+    appData.isSavedToFile = false;
     renderPositions(); saveAppData();
-    if (!matOk) alert(`У типовой позиции «${t.name}» материал удалён из прайса — выберите материал в позиции.`);
-    const cards = document.querySelectorAll('#positionsContainer .position-card');
-    if (cards.length) cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!matOk) alert(`У типовой «${t.name}» материал удалён из прайса — выберите материал в позиции.`);
+    scrollToPosition(created[0].id);
 }
 function renderTemplatesTable() {
     const tbody = document.getElementById('templatesTableBody');
@@ -3052,28 +3134,252 @@ function importProject(event) {
 // ------------------------------------------------------------------
 // УПРАВЛЕНИЕ ПОЗИЦИЯМИ (UI)
 // ------------------------------------------------------------------
-function addPosition(isUserAction = true) {
+function addPosition(isUserAction = true, linkToPosId = null) {
     const defMat = appData.materials[0];
     appData.positions.push({
-        id: Date.now() + Math.floor(Math.random() * 1000),
+        id: (lastAddedPositionId = Date.now() + Math.floor(Math.random() * 1000)),
         materialId: defMat.id, effType: defMat.type,
         matWidthM: 1.0, matHeightM: 1.0, printWidthM: 1.0, printHeightM: 1.0,
         quantity: 1, modeCode: defMat.recommendedMode, usePrimer: defMat.defaultPrimer,
         customScrapRate: defMat.scrapRate, priceTier: 'retail',
         manualTimeH: null, manualSetupFee: null,
         isMediumFormat: false, hasNoStock: false, noPrint: false, printer: 'auto', edgePrint: false,
-        duplex: 'none', backModeCode: '', manualBackSetupFee: null, duplexCutOpId: '', templateId: '', templateName: '', urgency: 'standard',
+        duplex: 'none', backModeCode: '', manualBackSetupFee: null, duplexCutOpId: '', templateId: '', templateName: '', linkId: '', linkName: '', urgency: 'standard',
         discountPercent: 0, discountNote: '',
         works: []
     });
+    if (linkToPosId !== null && linkToPosId !== undefined) {
+        const newPos = appData.positions[appData.positions.length - 1];
+        attachToLink(newPos, linkToPosId, true);
+    }
     
     if (isUserAction) appData.isSavedToFile = false;
     
     renderPositions(); saveAppData();
+    if (isUserAction) scrollToPosition(appData.positions.length ? lastAddedPositionId : null);
 }
+
+// ------------------------------------------------------------------
+// СВЯЗАННЫЕ ПОЗИЦИИ (ИЗДЕЛИЯ): плёнка + ПВХ с прикаткой = табличка и т.п.
+// Связанные позиции стоят в заказе подряд, у них общий номер (3.1, 3.2…),
+// общие размер, тираж, уровень цен, срочность и скидка (меняются сразу у всех).
+// ------------------------------------------------------------------
+let lastAddedPositionId = null;
+function newLinkId() {
+    return 'lnk_' + Date.now().toString(36) + Math.floor(Math.random() * 1000);
+}
+function linkMembers(linkId) {
+    return appData.positions.filter(p => linkId && p.linkId === linkId);
+}
+// Держим участников изделия подряд (на месте первого) и распускаем «изделия» из одной позиции.
+function normalizeLinkOrder() {
+    const counts = {};
+    appData.positions.forEach(p => { if (p.linkId) counts[p.linkId] = (counts[p.linkId] || 0) + 1; });
+    appData.positions.forEach(p => { if (p.linkId && counts[p.linkId] < 2) { p.linkId = ''; p.linkName = ''; } });
+    const out = [], seen = new Set();
+    appData.positions.forEach(p => {
+        if (!p.linkId) { out.push(p); return; }
+        if (seen.has(p.linkId)) return;
+        seen.add(p.linkId);
+        out.push(...appData.positions.filter(q => q.linkId === p.linkId));
+    });
+    appData.positions = out;
+}
+// Сквозная нумерация заказа: отдельная позиция или изделие — следующий номер,
+// позиции внутри изделия — 3.1, 3.2… Без пропусков после удаления.
+function computeNumbering() {
+    const labels = {}, items = [];
+    const list = appData.positions;
+    let n = 0, i = 0;
+    while (i < list.length) {
+        const p = list[i];
+        n++;
+        if (!p.linkId) {
+            labels[p.id] = String(n);
+            items.push({ type: 'single', number: n, positions: [p] });
+            i++;
+            continue;
+        }
+        const members = [];
+        let k = 0;
+        while (i < list.length && list[i].linkId === p.linkId) {
+            k++;
+            labels[list[i].id] = `${n}.${k}`;
+            members.push(list[i]);
+            i++;
+        }
+        items.push({ type: 'link', number: n, linkId: p.linkId, name: p.linkName || 'Изделие', positions: members });
+    }
+    return { labels, items };
+}
+function itemLabel(item) {
+    if (item.type === 'link') return `№${item.number}: 🔗 ${item.name} (${item.positions.length} поз.)`;
+    const p = item.positions[0];
+    const mat = appData.materials.find(m => m.id === p.materialId);
+    return `№${item.number}: ${p.templateName ? p.templateName + ' · ' : ''}${mat ? mat.name : 'позиция'}`;
+}
+// Ставит позицию pos в изделие позиции targetPosId (создаёт изделие, если его ещё нет)
+// и переносит её в конец этого изделия. copyShared — взять у изделия размер, тираж, уровень цен…
+function attachToLink(pos, targetPosId, copyShared) {
+    const target = appData.positions.find(p => p.id === targetPosId);
+    if (!target || target === pos) return;
+    if (!target.linkId) { target.linkId = newLinkId(); target.linkName = target.linkName || ''; }
+    pos.linkId = target.linkId;
+    pos.linkName = target.linkName;
+    if (copyShared) {
+        Object.assign(pos, {
+            matWidthM: target.matWidthM, matHeightM: target.matHeightM,
+            printWidthM: target.matWidthM, printHeightM: target.matHeightM,
+            quantity: target.quantity, priceTier: target.priceTier,
+            urgency: target.urgency, discountPercent: target.discountPercent
+        });
+    }
+    appData.positions = appData.positions.filter(p => p !== pos);
+    const members = linkMembers(target.linkId);
+    const lastIdx = appData.positions.indexOf(members[members.length - 1]);
+    appData.positions.splice(lastIdx + 1, 0, pos);
+    lastAddedPositionId = pos.id;
+}
+function linkPositionTo(posId, targetPosId) {
+    const pos = appData.positions.find(p => p.id === posId);
+    if (!pos || !targetPosId) return;
+    attachToLink(pos, Number(targetPosId), false);
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+function unlinkPosition(posId) {
+    const pos = appData.positions.find(p => p.id === posId);
+    if (!pos || !pos.linkId) return;
+    const members = linkMembers(pos.linkId);
+    const last = members[members.length - 1];
+    pos.linkId = ''; pos.linkName = '';
+    appData.positions = appData.positions.filter(p => p !== pos);
+    appData.positions.splice(appData.positions.indexOf(last) + (last === pos ? 0 : 1), 0, pos);
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+function dissolveLink(linkId) {
+    if (!confirm('Разъединить изделие? Позиции останутся в заказе отдельными, со своими настройками.')) return;
+    linkMembers(linkId).forEach(p => { p.linkId = ''; p.linkName = ''; });
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+function removeLink(linkId) {
+    const members = linkMembers(linkId);
+    if (!confirm(`Удалить изделие «${members[0] && members[0].linkName || 'Изделие'}» целиком (${members.length} поз.)?`)) return;
+    appData.positions = appData.positions.filter(p => p.linkId !== linkId);
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+function renameLink(linkId, name) {
+    linkMembers(linkId).forEach(p => { p.linkName = String(name || '').trim(); });
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+// Общие параметры изделия — меняются сразу у всех его позиций.
+function setLinkField(linkId, field, value) {
+    const members = linkMembers(linkId);
+    members.forEach(p => {
+        if (field === 'width') { p.matWidthM = value; p.printWidthM = value; }
+        else if (field === 'height') { p.matHeightM = value; p.printHeightM = value; }
+        else if (field === 'quantity') {
+            // Введённое вручную время печати масштабируем пропорционально тиражу.
+            if (p.manualTimeH !== null && p.quantity > 0 && value > 0) p.manualTimeH = Number((p.manualTimeH * value / p.quantity).toFixed(3));
+            p.quantity = value;
+        }
+        else p[field] = value;
+    });
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+function linkHeaderHtml(item, calcs) {
+    const first = item.positions[0];
+    const same = f => item.positions.every(p => p[f] === first[f]);
+    const sizeSame = same('matWidthM') && same('matHeightM');
+    const total = item.positions.reduce((s, p) => s + calcs[p.id].finalTotal, 0);
+    const before = item.positions.reduce((s, p) => s + calcs[p.id].posGrandTotal, 0);
+    const qtySame = same('quantity');
+    const cur = appData.config.baseCurrency;
+    const lid = jsArg(item.linkId);
+    return `<div class="link-head">
+        <div>
+            <div class="link-title">🔗 Изделие №${item.number}</div>
+            <input type="text" class="form-control user-editable" style="min-width: 230px; font-weight:600;" value="${escapeHtml(first.linkName)}" placeholder="Название: табличка, стенд…" onchange="renameLink(${lid}, this.value)">
+        </div>
+        <div class="form-group"><label>Ширина изделия (м):</label>
+            <input type="number" min="0.001" step="0.001" class="form-control user-editable" style="width:110px;" value="${first.matWidthM}" onchange="setLinkField(${lid}, 'width', Number(this.value))" title="Ставит размер заготовки и печати всем позициям изделия"></div>
+        <div class="form-group"><label>Длина изделия (м):</label>
+            <input type="number" min="0.001" step="0.001" class="form-control user-editable" style="width:110px;" value="${first.matHeightM}" onchange="setLinkField(${lid}, 'height', Number(this.value))"></div>
+        <div class="form-group"><label>Тираж (шт):</label>
+            <input type="number" min="1" class="form-control user-editable" style="width:90px;" value="${first.quantity}" onchange="setLinkField(${lid}, 'quantity', Math.max(1, Math.floor(Number(this.value))))"></div>
+        <div class="form-group"><label>Уровень цен:</label>
+            <select class="form-control user-editable" onchange="setLinkField(${lid}, 'priceTier', this.value)">
+                <option value="retail" ${first.priceTier === 'retail' ? 'selected' : ''}>Розница</option>
+                <option value="wholesale" ${first.priceTier === 'wholesale' ? 'selected' : ''}>Опт</option>
+                <option value="dealer" ${first.priceTier === 'dealer' ? 'selected' : ''}>Дилер</option>
+            </select></div>
+        <div class="form-group"><label>Срок:</label>
+            <select class="form-control user-editable" onchange="setLinkField(${lid}, 'urgency', this.value)">
+                <option value="standard" ${first.urgency === 'standard' ? 'selected' : ''}>Стандарт</option>
+                <option value="24h" ${first.urgency === '24h' ? 'selected' : ''}>24ч (+30%)</option>
+                <option value="same_day" ${first.urgency === 'same_day' ? 'selected' : ''}>День-в-день (+50%)</option>
+            </select></div>
+        <div class="form-group"><label>Скидка (%):</label>
+            <input type="number" min="0" max="100" class="form-control user-editable" style="width:80px;" value="${first.discountPercent}" onchange="setLinkField(${lid}, 'discountPercent', Math.min(100, Math.max(0, Number(this.value))))"></div>
+        <div class="link-total">${before > total ? `<span style="text-decoration:line-through; color:var(--text-muted); font-size:14px; font-weight:400;">${before.toFixed(2)}</span> ` : ''}${total.toFixed(2)} ${cur}
+            <small>${qtySame && first.quantity > 0 ? `за 1 изделие: ${(total / first.quantity).toFixed(2)} ${cur}` : 'тираж у позиций разный'}</small></div>
+    </div>
+    ${!sizeSame || !qtySame || !same('priceTier') || !same('urgency') || !same('discountPercent') ? `<div class="warning-box" style="margin-bottom:10px;">⚠️ У позиций изделия разные ${[!sizeSame && 'размеры', !qtySame && 'тиражи', !same('priceTier') && 'уровни цен', !same('urgency') && 'сроки', !same('discountPercent') && 'скидки'].filter(Boolean).join(', ')}. Значение, введённое выше, ставится всем позициям.</div>` : ''}
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+        <button class="btn btn-outline btn-sm" onclick="addPosition(true, ${first.id})">➕ Добавить позицию в изделие</button>
+        <button class="btn btn-outline btn-sm" onclick="openTemplatePicker(${first.id})">📋 Типовая в изделие</button>
+        <button class="btn btn-outline btn-sm" onclick="saveLinkAsTemplate(${lid})">⭐ Изделие в типовые</button>
+        <button class="btn btn-outline btn-sm" onclick="dissolveLink(${lid})">✂️ Разъединить</button>
+        <button class="btn btn-danger btn-sm" onclick="removeLink(${lid})">🗑 Удалить изделие</button>
+    </div>`;
+}
+function linkControlsHtml(pos, numbering) {
+    if (pos.linkId) {
+        return `<button class="btn btn-outline" onclick="unlinkPosition(${pos.id})" title="Сделать отдельной позицией заказа">✂️ Отвязать</button>`;
+    }
+    const others = numbering.items.filter(it => !it.positions.includes(pos));
+    return `<button class="btn btn-outline" onclick="addPosition(true, ${pos.id})" title="Добавить позицию, связанную с этой (вместе — одно изделие: табличка, стенд…)">🔗 + связанная</button>
+        ${others.length ? `<select class="form-control" style="width:auto; max-width:200px; padding:6px;" onchange="linkPositionTo(${pos.id}, this.value)" title="Объединить эту позицию с другой в одно изделие">
+            <option value="">🔗 Связать с…</option>
+            ${others.map(it => `<option value="${it.positions[0].id}">${escapeHtml(itemLabel(it))}</option>`).join('')}
+        </select>` : ''}`;
+}
+// Выбор при добавлении: отдельная позиция или связанная с существующей.
+let pendingTemplateAdd = null;
+function openAddPositionChoice() {
+    if (!appData.positions.length) { addPosition(); return; }
+    pendingTemplateAdd = null;
+    renderAddChoice('Новая позиция');
+}
+function renderAddChoice(title) {
+    const { items } = computeNumbering();
+    document.getElementById('addChoiceTitle').textContent = title;
+    document.getElementById('addChoiceList').innerHTML = `
+        <button class="btn btn-primary" style="width:100%; justify-content:flex-start; margin-bottom:10px;" onclick="chooseAddTarget(null)">➕ Отдельная позиция</button>
+        <div style="font-size:12px; color:var(--text-muted); margin:6px 0;">или связанная (вместе — одно изделие):</div>
+        ${items.map(it => `<button class="btn btn-outline" style="width:100%; justify-content:flex-start; margin-bottom:6px; text-align:left;" onclick="chooseAddTarget(${it.positions[0].id})">🔗 Связать с ${escapeHtml(itemLabel(it))}</button>`).join('')}`;
+    document.getElementById('addChoiceModal').style.display = 'flex';
+}
+function chooseAddTarget(targetId) {
+    document.getElementById('addChoiceModal').style.display = 'none';
+    if (pendingTemplateAdd) { const t = pendingTemplateAdd; pendingTemplateAdd = null; addPositionFromTemplate(t, targetId, true); return; }
+    addPosition(true, targetId);
+}
+function scrollToPosition(posId) {
+    if (!posId) return;
+    const el = document.querySelector(`[data-pos-id="${posId}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 
 function removePosition(id) {
     appData.positions = appData.positions.filter(p => p.id !== id);
+    normalizeLinkOrder();
     appData.isSavedToFile = false;
     renderPositions(); saveAppData();
 }
@@ -3146,11 +3452,35 @@ function renderPositions() {
 
     let totalAreaAll = 0, totalTimeAll = 0, totalPrintSellAll = 0, totalMatSellAll = 0, grandTotalAll = 0, totalDiscountAmountAll = 0, finalGrandTotalAll = 0, totalWorksAll = 0;
 
+    normalizeLinkOrder();
+    const numbering = computeNumbering();
+    const calcs = {};
+    appData.positions.forEach(pos => { calcs[pos.id] = calculatePositionValues(pos); });
+    let groupEl = null, groupLinkId = null;
+
     appData.positions.forEach((pos, index) => {
-        const calc = calculatePositionValues(pos);
+        const calc = calcs[pos.id];
+        // Изделие: рамка с общими параметрами, внутри — его позиции.
+        let target = container;
+        if (pos.linkId) {
+            if (pos.linkId !== groupLinkId) {
+                groupLinkId = pos.linkId;
+                groupEl = document.createElement('div');
+                groupEl.className = 'link-group';
+                groupEl.dataset.linkId = pos.linkId;
+                const item = numbering.items.find(it => it.linkId === pos.linkId);
+                groupEl.innerHTML = linkHeaderHtml(item, calcs);
+                container.appendChild(groupEl);
+            }
+            target = groupEl;
+        } else { groupLinkId = null; groupEl = null; }
 
         if (!pos.matWidthM || (!pos.noPrint && !pos.printWidthM) || pos.quantity <= 0) {
-            container.innerHTML += `<div class="position-card error-box"><button class="btn btn-danger btn-sm" onclick="removePosition(${pos.id})" style="float:right;">🗑</button>⚠️ Укажите размеры в метрах и тираж > 0</div>`;
+            const err = document.createElement('div');
+            err.className = 'position-card error-box';
+            err.dataset.posId = pos.id;
+            err.innerHTML = `<button class="btn btn-danger btn-sm" onclick="removePosition(${pos.id})" style="float:right;">🗑</button>Позиция №${numbering.labels[pos.id]}: ⚠️ Укажите размеры в метрах и тираж > 0`;
+            target.appendChild(err);
             return;
         }
 
@@ -3165,11 +3495,13 @@ function renderPositions() {
 
         const card = document.createElement('div');
         card.className = 'position-card';
+        card.dataset.posId = pos.id;
 
         card.innerHTML = `
             <div class="pos-header">
-                <span class="pos-title">Позиция №${index + 1}: ${pos.templateName ? `📋 ${escapeHtml(pos.templateName)} · ` : ''}${escapeHtml(calc.mat.name)}</span>
-                <div style="display:flex; gap:8px;">
+                <span class="pos-title">Позиция №${numbering.labels[pos.id]}: ${pos.templateName ? `📋 ${escapeHtml(pos.templateName)} · ` : ''}${escapeHtml(calc.mat.name)}</span>
+                <div style="display:flex; gap:8px; flex-wrap: wrap; justify-content: flex-end;">
+                    ${linkControlsHtml(pos, numbering)}
                     <button class="btn btn-outline" onclick="savePositionAsTemplate(${pos.id})" title="Сохранить настройки этой позиции как типовую (шаблон), чтобы потом добавлять её одной кнопкой «📋 Типовая позиция»">⭐ В типовые</button>
                     <button class="btn btn-danger" onclick="removePosition(${pos.id})">🗑 Удалить</button>
                 </div>
@@ -3338,10 +3670,12 @@ function renderPositions() {
                 </div>
             </div>
         `;
-        container.appendChild(card);
+        target.appendChild(card);
     });
 
-    document.getElementById('totalPositionsCount').innerText = appData.positions.length;
+    document.getElementById('totalPositionsCount').innerText = numbering.items.length === appData.positions.length
+        ? appData.positions.length
+        : `${numbering.items.length} (строк: ${appData.positions.length})`;
     document.getElementById('totalOrderArea').innerText = totalAreaAll.toFixed(2) + ' м²';
     document.getElementById('totalOrderTime').innerText = totalTimeAll.toFixed(2) + ' ч';
     document.getElementById('totalPrintMatSplit').innerText = `${totalPrintSellAll.toFixed(0)} / ${totalMatSellAll.toFixed(0)} ${appData.config.baseCurrency}`;
@@ -4904,7 +5238,36 @@ function printClientEstimate() {
 
     let grandTotal = 0;
     let grandTotalBeforeDiscount = 0;
-    appData.positions.forEach((pos, i) => {
+    normalizeLinkOrder();
+    const numbering = computeNumbering();
+    numbering.items.forEach(item => {
+        if (item.type !== 'link') return;
+        // Изделие — одной строкой: название, размер, тираж, цена за штуку, состав.
+        const calcsL = item.positions.map(p => ({ p, c: calculatePositionValues(p) }));
+        const total = calcsL.reduce((s, x) => s + x.c.finalTotal, 0);
+        const before = calcsL.reduce((s, x) => s + x.c.posGrandTotal, 0);
+        grandTotal += total;
+        grandTotalBeforeDiscount += before;
+        const first = item.positions[0];
+        const qty = first.quantity;
+        const disc = before > 0 ? Math.round((1 - total / before) * 1000) / 10 : 0;
+        const sumCell = showDiscount && before > total
+            ? `<span style="text-decoration:line-through; color:#888; font-weight:400;">${before.toFixed(2)}</span> <strong>${total.toFixed(2)} ${appData.config.baseCurrency}</strong>`
+            : `<strong>${total.toFixed(2)} ${appData.config.baseCurrency}</strong>`;
+        item.pdfRow = `<tr>
+                    <td>${item.number}</td>
+                    <td><strong>${escapeHtml(item.name)}</strong><div style="margin-top:6px; font-size:12px; color:#333;">Состав:${calcsL.map(x => `<br>• ${escapeHtml(x.c.mat.name)} — ${x.c.noPrint ? 'без печати' : `печать: ${escapeHtml(x.c.mode.name.split('(')[0])}${x.c.back ? ', с двух сторон' : ''}`}${x.c.worksLines.length ? `; ${x.c.worksLines.map(l => escapeHtml(l.op.name)).join(', ')}` : ''}`).join('')}</div></td>
+                    <td>${first.matWidthM.toFixed(2)} x ${first.matHeightM.toFixed(2)}</td>
+                    <td>${qty} шт</td>
+                    <td>${qty > 0 ? (total / qty).toFixed(2) : '—'} ${appData.config.baseCurrency}</td>
+                    ${showDiscount ? `<td>${disc > 0 ? disc + '%' : '—'}</td>` : ''}
+                    <td>${sumCell}</td>
+                 </tr>`;
+    });
+    numbering.items.forEach(item => {
+        if (item.type === 'link') { html += item.pdfRow; return; }
+        const pos = item.positions[0];
+        const i = item.number - 1;
         const calc = calculatePositionValues(pos);
         if (!pos.printWidthM || pos.quantity <= 0) return;
 
@@ -4965,12 +5328,15 @@ function printClientEstimate() {
 
 function buildExportRows() {
     const rows = [];
+    normalizeLinkOrder();
+    const numbering = computeNumbering();
     appData.positions.forEach((pos, index) => {
         const calc = calculatePositionValues(pos);
         if (!pos.matWidthM || (!pos.noPrint && !pos.printWidthM) || pos.quantity <= 0) return;
 
         rows.push({
-            '№': index + 1,
+            '№': numbering.labels[pos.id],
+            'Изделие': pos.linkId ? (pos.linkName || 'Изделие') : '',
             'Заказ': appData.orderName || '---',
             'Материал': calc.mat.name,
             'Режим печати': calc.noPrint ? 'Без печати (чистый материал)' : calc.mode.name,
