@@ -852,8 +852,10 @@ function normalizePosition(raw, index = 0) {
     const material = appData.materials[0] || defaultAppData.materials[0];
     const id = Number(source.id);
     const safeId = Number.isSafeInteger(id) && id > 0 ? id : Date.now() + index;
-    const width = validNumber(source.matWidthM, 1, 0.001);
-    const height = validNumber(source.matHeightM, 1, 0.001);
+    // Пустая (новая, ещё не заполненная) позиция: материал, размер и тираж не заданы (null).
+    const isEmptyVal = v => v === null || v === '' || v === 0;
+    const width = isEmptyVal(source.matWidthM) ? null : validNumber(source.matWidthM, 1, 0.001);
+    const height = isEmptyVal(source.matHeightM) ? null : validNumber(source.matHeightM, 1, 0.001);
     const modeCode = appData.printModes[source.modeCode] ? source.modeCode : material.recommendedMode;
     return {
         id: safeId,
@@ -861,9 +863,9 @@ function normalizePosition(raw, index = 0) {
         effType: source.effType === 'roll' ? 'roll' : 'sheet',
         matWidthM: width,
         matHeightM: height,
-        printWidthM: Math.min(validNumber(source.printWidthM, width, 0.001), width),
-        printHeightM: Math.min(validNumber(source.printHeightM, height, 0.001), height),
-        quantity: Math.max(1, Math.floor(validNumber(source.quantity, 1, 1))),
+        printWidthM: width === null ? null : Math.min(validNumber(source.printWidthM, width, 0.001), width),
+        printHeightM: height === null ? null : Math.min(validNumber(source.printHeightM, height, 0.001), height),
+        quantity: isEmptyVal(source.quantity) ? null : Math.max(1, Math.floor(validNumber(source.quantity, 1, 1))),
         modeCode,
         usePrimer: Boolean(source.usePrimer),
         customScrapRate: validNumber(source.customScrapRate, material.scrapRate, 0),
@@ -3134,14 +3136,18 @@ function importProject(event) {
 // ------------------------------------------------------------------
 // УПРАВЛЕНИЕ ПОЗИЦИЯМИ (UI)
 // ------------------------------------------------------------------
+// Новая позиция — пустая: без материала, размера и тиража. Уровень цен — как у
+// предыдущей позиции заказа. Связанная позиция берёт размер, тираж, уровень цен,
+// срок и скидку у изделия (attachToLink).
 function addPosition(isUserAction = true, linkToPosId = null) {
     const defMat = appData.materials[0];
+    const prev = appData.positions[appData.positions.length - 1];
     appData.positions.push({
         id: (lastAddedPositionId = Date.now() + Math.floor(Math.random() * 1000)),
-        materialId: defMat.id, effType: defMat.type,
-        matWidthM: 1.0, matHeightM: 1.0, printWidthM: 1.0, printHeightM: 1.0,
-        quantity: 1, modeCode: defMat.recommendedMode, usePrimer: defMat.defaultPrimer,
-        customScrapRate: defMat.scrapRate, priceTier: 'retail',
+        materialId: '', effType: defMat.type,
+        matWidthM: null, matHeightM: null, printWidthM: null, printHeightM: null,
+        quantity: null, modeCode: defMat.recommendedMode, usePrimer: false,
+        customScrapRate: defMat.scrapRate, priceTier: prev ? prev.priceTier : 'retail',
         manualTimeH: null, manualSetupFee: null,
         isMediumFormat: false, hasNoStock: false, noPrint: false, printer: 'auto', edgePrint: false,
         duplex: 'none', backModeCode: '', manualBackSetupFee: null, duplexCutOpId: '', templateId: '', templateName: '', linkId: '', linkName: '', urgency: 'standard',
@@ -3165,6 +3171,54 @@ function addPosition(isUserAction = true, linkToPosId = null) {
 // общие размер, тираж, уровень цен, срочность и скидка (меняются сразу у всех).
 // ------------------------------------------------------------------
 let lastAddedPositionId = null;
+// Позиция заполнена настолько, что её можно посчитать.
+function isPositionComplete(pos) {
+    return Boolean(pos.materialId && appData.materials.some(m => m.id === pos.materialId)
+        && pos.matWidthM > 0 && pos.matHeightM > 0 && pos.quantity > 0
+        && (pos.noPrint || (pos.printWidthM > 0 && pos.printHeightM > 0)));
+}
+// Карточка незаполненной позиции: только материал, размер, тираж и уровень цен.
+function draftCardHtml(pos, numbering) {
+    const v = x => (x === null || x === undefined || x === 0) ? '' : x;
+    const missing = [!pos.materialId && 'материал', !(pos.matWidthM > 0 && pos.matHeightM > 0) && 'размер', !(pos.quantity > 0) && 'тираж'].filter(Boolean);
+    return `<div class="pos-header">
+            <span class="pos-title">Позиция №${numbering.labels[pos.id]}: новая</span>
+            <div style="display:flex; gap:8px; flex-wrap: wrap; justify-content: flex-end;">
+                ${linkControlsHtml(pos, numbering)}
+                <button class="btn btn-danger" onclick="removePosition(${pos.id})">🗑 Удалить</button>
+            </div>
+        </div>
+        <div class="warning-box" style="background:#f8fafc; border-color: var(--border); color: var(--text);">Заполните: ${missing.join(', ') || '—'}. После этого позиция посчитается и откроются остальные настройки.</div>
+        <div class="grid">
+            <div class="form-group" style="grid-column: span 2;">
+                <label>Материал:</label>
+                <select class="form-control user-editable ${pos.materialId ? '' : 'highlight-input'}" onchange="onMaterialChange(${pos.id}, this.value)">
+                    <option value="" ${pos.materialId ? '' : 'selected'} disabled>— выберите материал —</option>
+                    ${materialOptionsHtml(pos.materialId)}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Ширина заготовки (м):</label>
+                <input type="number" min="0.001" step="0.001" class="form-control user-editable" value="${v(pos.matWidthM)}" placeholder="напр. 0.6" onchange="updatePosField(${pos.id}, 'matWidthM', this.value === '' ? null : Number(this.value))">
+            </div>
+            <div class="form-group">
+                <label>Длина заготовки (м):</label>
+                <input type="number" min="0.001" step="0.001" class="form-control user-editable" value="${v(pos.matHeightM)}" placeholder="напр. 0.4" onchange="updatePosField(${pos.id}, 'matHeightM', this.value === '' ? null : Number(this.value))">
+            </div>
+            <div class="form-group">
+                <label>Тираж (шт):</label>
+                <input type="number" min="1" class="form-control user-editable" value="${v(pos.quantity)}" placeholder="шт" onchange="updatePosField(${pos.id}, 'quantity', this.value === '' ? null : Math.max(1, Math.floor(Number(this.value))))">
+            </div>
+            <div class="form-group">
+                <label>Уровень цен:</label>
+                <select class="form-control user-editable" onchange="updatePosField(${pos.id}, 'priceTier', this.value)">
+                    <option value="retail" ${pos.priceTier === 'retail' ? 'selected' : ''}>Розница (x${appData.config.markupRetail})</option>
+                    <option value="wholesale" ${pos.priceTier === 'wholesale' ? 'selected' : ''}>Опт (x${appData.config.markupWholesale})</option>
+                    <option value="dealer" ${pos.priceTier === 'dealer' ? 'selected' : ''}>Дилер (x${appData.config.markupDealer})</option>
+                </select>
+            </div>
+        </div>`;
+}
 function newLinkId() {
     return 'lnk_' + Date.now().toString(36) + Math.floor(Math.random() * 1000);
 }
@@ -3296,8 +3350,8 @@ function linkHeaderHtml(item, calcs) {
     const first = item.positions[0];
     const same = f => item.positions.every(p => p[f] === first[f]);
     const sizeSame = same('matWidthM') && same('matHeightM');
-    const total = item.positions.reduce((s, p) => s + calcs[p.id].finalTotal, 0);
-    const before = item.positions.reduce((s, p) => s + calcs[p.id].posGrandTotal, 0);
+    const total = item.positions.reduce((s, p) => s + (calcs[p.id] ? calcs[p.id].finalTotal : 0), 0);
+    const before = item.positions.reduce((s, p) => s + (calcs[p.id] ? calcs[p.id].posGrandTotal : 0), 0);
     const qtySame = same('quantity');
     const cur = appData.config.baseCurrency;
     const lid = jsArg(item.linkId);
@@ -3307,11 +3361,11 @@ function linkHeaderHtml(item, calcs) {
             <input type="text" class="form-control user-editable" style="min-width: 230px; font-weight:600;" value="${escapeHtml(first.linkName)}" placeholder="Название: табличка, стенд…" onchange="renameLink(${lid}, this.value)">
         </div>
         <div class="form-group"><label>Ширина изделия (м):</label>
-            <input type="number" min="0.001" step="0.001" class="form-control user-editable" style="width:110px;" value="${first.matWidthM}" onchange="setLinkField(${lid}, 'width', Number(this.value))" title="Ставит размер заготовки и печати всем позициям изделия"></div>
+            <input type="number" min="0.001" step="0.001" class="form-control user-editable" style="width:110px;" value="${first.matWidthM ?? ''}" onchange="setLinkField(${lid}, 'width', Number(this.value))" title="Ставит размер заготовки и печати всем позициям изделия"></div>
         <div class="form-group"><label>Длина изделия (м):</label>
-            <input type="number" min="0.001" step="0.001" class="form-control user-editable" style="width:110px;" value="${first.matHeightM}" onchange="setLinkField(${lid}, 'height', Number(this.value))"></div>
+            <input type="number" min="0.001" step="0.001" class="form-control user-editable" style="width:110px;" value="${first.matHeightM ?? ''}" onchange="setLinkField(${lid}, 'height', Number(this.value))"></div>
         <div class="form-group"><label>Тираж (шт):</label>
-            <input type="number" min="1" class="form-control user-editable" style="width:90px;" value="${first.quantity}" onchange="setLinkField(${lid}, 'quantity', Math.max(1, Math.floor(Number(this.value))))"></div>
+            <input type="number" min="1" class="form-control user-editable" style="width:90px;" value="${first.quantity ?? ''}" onchange="setLinkField(${lid}, 'quantity', Math.max(1, Math.floor(Number(this.value))))"></div>
         <div class="form-group"><label>Уровень цен:</label>
             <select class="form-control user-editable" onchange="setLinkField(${lid}, 'priceTier', this.value)">
                 <option value="retail" ${first.priceTier === 'retail' ? 'selected' : ''}>Розница</option>
@@ -3406,8 +3460,8 @@ function updatePosField(posId, field, value) {
         if (field === 'matWidthM') pos.printWidthM = value;
         if (field === 'matHeightM') pos.printHeightM = value;
 
-        if (field === 'printWidthM' && value > pos.matWidthM) pos.printWidthM = pos.matWidthM;
-        if (field === 'printHeightM' && value > pos.matHeightM) pos.printHeightM = pos.matHeightM;
+        if (field === 'printWidthM' && pos.matWidthM > 0 && value > pos.matWidthM) pos.printWidthM = pos.matWidthM;
+        if (field === 'printHeightM' && pos.matHeightM > 0 && value > pos.matHeightM) pos.printHeightM = pos.matHeightM;
 
         appData.isSavedToFile = false;
         renderPositions(); saveAppData();
@@ -3455,7 +3509,7 @@ function renderPositions() {
     normalizeLinkOrder();
     const numbering = computeNumbering();
     const calcs = {};
-    appData.positions.forEach(pos => { calcs[pos.id] = calculatePositionValues(pos); });
+    appData.positions.forEach(pos => { calcs[pos.id] = isPositionComplete(pos) ? calculatePositionValues(pos) : null; });
     let groupEl = null, groupLinkId = null;
 
     appData.positions.forEach((pos, index) => {
@@ -3475,12 +3529,13 @@ function renderPositions() {
             target = groupEl;
         } else { groupLinkId = null; groupEl = null; }
 
-        if (!pos.matWidthM || (!pos.noPrint && !pos.printWidthM) || pos.quantity <= 0) {
-            const err = document.createElement('div');
-            err.className = 'position-card error-box';
-            err.dataset.posId = pos.id;
-            err.innerHTML = `<button class="btn btn-danger btn-sm" onclick="removePosition(${pos.id})" style="float:right;">🗑</button>Позиция №${numbering.labels[pos.id]}: ⚠️ Укажите размеры в метрах и тираж > 0`;
-            target.appendChild(err);
+        if (!calc) {
+            const draft = document.createElement('div');
+            draft.className = 'position-card';
+            draft.style.borderStyle = 'dashed';
+            draft.dataset.posId = pos.id;
+            draft.innerHTML = draftCardHtml(pos, numbering);
+            target.appendChild(draft);
             return;
         }
 
@@ -5243,7 +5298,8 @@ function printClientEstimate() {
     numbering.items.forEach(item => {
         if (item.type !== 'link') return;
         // Изделие — одной строкой: название, размер, тираж, цена за штуку, состав.
-        const calcsL = item.positions.map(p => ({ p, c: calculatePositionValues(p) }));
+        const calcsL = item.positions.filter(isPositionComplete).map(p => ({ p, c: calculatePositionValues(p) }));
+        if (!calcsL.length) { item.pdfRow = ''; return; }
         const total = calcsL.reduce((s, x) => s + x.c.finalTotal, 0);
         const before = calcsL.reduce((s, x) => s + x.c.posGrandTotal, 0);
         grandTotal += total;
@@ -5268,8 +5324,8 @@ function printClientEstimate() {
         if (item.type === 'link') { html += item.pdfRow; return; }
         const pos = item.positions[0];
         const i = item.number - 1;
+        if (!isPositionComplete(pos)) return;
         const calc = calculatePositionValues(pos);
-        if (!pos.printWidthM || pos.quantity <= 0) return;
 
         grandTotal += calc.finalTotal;
         grandTotalBeforeDiscount += calc.posGrandTotal;
@@ -5331,8 +5387,8 @@ function buildExportRows() {
     normalizeLinkOrder();
     const numbering = computeNumbering();
     appData.positions.forEach((pos, index) => {
+        if (!isPositionComplete(pos)) return;
         const calc = calculatePositionValues(pos);
-        if (!pos.matWidthM || (!pos.noPrint && !pos.printWidthM) || pos.quantity <= 0) return;
 
         rows.push({
             '№': numbering.labels[pos.id],
