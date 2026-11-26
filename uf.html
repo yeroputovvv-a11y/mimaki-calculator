@@ -231,7 +231,6 @@
     <div class="toolbar">
         <div class="group">
             <button class="btn btn-primary" onclick="openAddPositionChoice()">➕ Добавить позицию</button>
-            <button class="btn btn-outline" style="border-color: var(--primary); color: var(--primary);" onclick="openTemplatePicker()" title="Добавить готовую типовую позицию (А2 на картоне, ручки, ХДФ…) — останется ввести тираж">📋 Типовая позиция</button>
             <button class="btn btn-outline" style="border-color: var(--danger); color: var(--danger);" onclick="startNewOrder()" title="Очистить все позиции и начать новый расчет">🆕 Новый заказ</button>
             
             <input type="text" id="orderClientName" class="form-control" placeholder="Название заказа / Имя клиента" style="width: 250px; font-weight: 600;" onchange="appData.orderName = this.value; appData.isSavedToFile = false; saveAppData();" title="Это название будет использовано в файлах экспорта и в PDF">
@@ -565,7 +564,7 @@
         </div>
 
         <div class="modal-section" style="margin-top: 30px;">📋 Типовые позиции (шаблоны)</div>
-        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Готовые позиции для частых задач (А1/А2 на картоне, печать на ручках, ХДФ нужного размера, двусторонние визитки…). Менеджер добавляет их кнопкой «📋 Типовая позиция» и вводит только тираж. Создать: настройте позицию в заказе → «⭐ В типовые». Изменить настройки: добавьте типовую в заказ, поправьте, снова «⭐ В типовые» → «Обновить». Здесь — названия, разделы, порядок и удаление.</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Готовые позиции для частых задач (А1/А2 на картоне, печать на ручках, ХДФ нужного размера, двусторонние визитки…). Менеджер добавляет их кнопкой «➕ Добавить позицию» → «📋 Типовая» (с поиском) и вводит только тираж. Создать: настройте позицию в заказе → «⭐ В типовые». Изменить настройки: добавьте типовую в заказ, поправьте, снова «⭐ В типовые» → «Обновить». Здесь — названия, разделы, порядок и удаление.</p>
         <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="1">
             <table class="mat-table">
                 <thead>
@@ -621,7 +620,7 @@
             <button class="btn btn-outline" onclick="document.getElementById('addChoiceModal').style.display='none'">✕</button>
         </div>
         <div id="addChoiceList"></div>
-        <p style="font-size:12px; color:var(--text-muted); margin-top:10px;">Связанные позиции — одно изделие (например, плёнка с печатью + ПВХ без печати с прикаткой и порезкой = табличка). У изделия общий номер, размер, тираж, уровень цен, срок и скидка. Отвязать позицию можно кнопкой «✂️ Отвязать».</p>
+        <p style="font-size:12px; color:var(--text-muted); margin-top:12px;">Индивидуальная — пустая позиция, всё задаётся вручную. Типовая — готовая из списка (найдите поиском; если нужной нет — кнопка «✏️ Нет нужной — индивидуальная»). Связанные позиции — одно изделие (например, плёнка с печатью + ПВХ без печати с прикаткой и порезкой = табличка): общий номер, размер, тираж, уровень цен, срок и скидка.</p>
     </div>
 </div>
 
@@ -632,9 +631,13 @@
             <h2>📋 Типовые позиции</h2>
             <button class="btn btn-outline" onclick="closeTemplatePicker()">✕</button>
         </div>
-        <input type="text" id="templateSearch" class="form-control" placeholder="Поиск: картон, А2, ручки, ХДФ…" oninput="renderTemplatePicker()" style="margin-bottom: 12px;">
-        <div id="templatePickerList"></div>
-        <p style="font-size:12px; color:var(--text-muted); margin-top: 12px;">Как добавить новую типовую позицию: настройте обычную позицию (материал, размеры, принтер, режим, двусторонняя печать, доп. работы) и нажмите в ней «⭐ В типовые». Список и названия правятся в Админке, раздел «📋 Типовые позиции». Типовые позиции хранятся в прайсе — после изменений опубликуйте прайс.</p>
+        <div id="templateTargetInfo" style="font-size:12px; color:#0369a1; margin-bottom:6px;"></div>
+        <div style="display:flex; gap:8px; margin-bottom: 12px;">
+            <input type="text" id="templateSearch" class="form-control" placeholder="Поиск: картон, А2, ручки, ХДФ…" oninput="renderTemplatePicker()">
+            <button class="btn btn-outline" style="white-space:nowrap;" onclick="templatePickerToCustom()" title="Нужной типовой нет — добавить пустую индивидуальную позицию">✏️ Нет нужной — индивидуальная</button>
+        </div>
+        <div id="templatePickerList" style="max-height: 55vh; overflow-y: auto;"></div>
+        <p style="font-size:12px; color:var(--text-muted); margin-top: 12px;">Как пополнить список типовых: настройте обычную позицию (материал, размеры, принтер, режим, двусторонняя печать, доп. работы) и нажмите в ней «⭐ В типовые». Список и названия правятся в Админке, раздел «📋 Типовые позиции». Типовые позиции хранятся в прайсе — после изменений опубликуйте прайс.</p>
     </div>
 </div>
 
@@ -2577,8 +2580,15 @@ function saveLinkAsTemplate(linkId) {
     alert(`Изделие «${tplName}» сохранено в типовые.\n\nЧтобы оно сохранилось в тестовом прайсе на Drive, откройте Админку и нажмите «☁️ Опубликовать прайс».`);
 }
 let templatePickerTarget = null;
-function openTemplatePicker(targetPosId = null) {
+let templatePickerDecided = false;
+function openTemplatePicker(targetPosId = null, decided = false) {
     templatePickerTarget = targetPosId;
+    templatePickerDecided = decided || targetPosId !== null;
+    const info = document.getElementById('templateTargetInfo');
+    if (info) {
+        const item = targetPosId !== null ? computeNumbering().items.find(it => it.positions.some(p => p.id === targetPosId)) : null;
+        info.textContent = item ? `Добавится в изделие: ${itemLabel(item)}` : (templatePickerDecided ? 'Добавится отдельной позицией заказа' : '');
+    }
     document.getElementById('templateSearch').value = '';
     renderTemplatePicker();
     document.getElementById('templatePickerModal').style.display = 'flex';
@@ -2587,12 +2597,21 @@ function openTemplatePicker(targetPosId = null) {
 function closeTemplatePicker() {
     document.getElementById('templatePickerModal').style.display = 'none';
 }
+// Нужной типовой нет — добавляем пустую индивидуальную туда же (отдельно или в изделие).
+function templatePickerToCustom() {
+    const target = templatePickerTarget;
+    const decided = templatePickerDecided;
+    closeTemplatePicker();
+    if (!decided && appData.positions.length) { openAddPositionChoice(); return; }
+    addPosition(true, target);
+}
 function renderTemplatePicker() {
     const list = document.getElementById('templatePickerList');
     const q = document.getElementById('templateSearch').value.trim().toLowerCase();
     const items = (appData.positionTemplates || []).filter(t => !q || (t.name + ' ' + t.section + ' ' + templateSummary(t)).toLowerCase().includes(q));
     if (!items.length) {
-        list.innerHTML = `<div style="padding: 16px; color: var(--text-muted);">${(appData.positionTemplates || []).length ? 'Ничего не найдено.' : 'Типовых позиций пока нет. Настройте позицию и нажмите в ней «⭐ В типовые».'}</div>`;
+        list.innerHTML = `<div style="padding: 16px; color: var(--text-muted);">${(appData.positionTemplates || []).length ? 'Ничего не найдено.' : 'Типовых позиций пока нет. Настройте позицию и нажмите в ней «⭐ В типовые».'}
+            <div style="margin-top:10px;"><button class="btn btn-primary btn-sm" onclick="templatePickerToCustom()">✏️ Добавить индивидуальную позицию</button></div></div>`;
         return;
     }
     const sections = [];
@@ -2615,7 +2634,7 @@ function addPositionFromTemplate(tplId, targetId = null, decided = false) {
     if (!t) return;
     closeTemplatePicker();
     if (!decided) {
-        if (templatePickerTarget !== null) { targetId = templatePickerTarget; }
+        if (templatePickerDecided) { targetId = templatePickerTarget; }
         else if (appData.positions.length) { pendingTemplateAdd = tplId; renderAddChoice(`Типовая: ${t.name}`); return; }
     }
     const rawList = t.item ? t.item.positions : [t.position];
@@ -3405,10 +3424,41 @@ function linkControlsHtml(pos, numbering) {
 }
 // Выбор при добавлении: отдельная позиция или связанная с существующей.
 let pendingTemplateAdd = null;
+// «➕ Добавить позицию»: сначала выбор — индивидуальная или типовая, и куда
+// (отдельно или в изделие с существующей позицией).
+let addStartTarget = null;
 function openAddPositionChoice() {
-    if (!appData.positions.length) { addPosition(); return; }
     pendingTemplateAdd = null;
-    renderAddChoice('Новая позиция');
+    addStartTarget = null;
+    renderAddStart();
+    document.getElementById('addChoiceModal').style.display = 'flex';
+}
+function renderAddStart() {
+    const { items } = computeNumbering();
+    document.getElementById('addChoiceTitle').textContent = 'Добавить позицию';
+    document.getElementById('addChoiceList').innerHTML = `
+        ${items.length ? `<div class="form-group" style="margin-bottom:14px;">
+            <label>Куда:</label>
+            <select class="form-control" onchange="addStartTarget = this.value ? Number(this.value) : null">
+                <option value="">Отдельной позицией заказа</option>
+                ${items.map(it => `<option value="${it.positions[0].id}" ${addStartTarget === it.positions[0].id ? 'selected' : ''}>🔗 Связать с ${escapeHtml(itemLabel(it))}</option>`).join('')}
+            </select>
+        </div>` : ''}
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <button class="btn btn-primary" style="padding:16px; display:flex; flex-direction:column; align-items:flex-start; gap:4px; text-align:left;" onclick="chooseAddKind('custom')">
+                <span style="font-size:16px;">✏️ Индивидуальная</span>
+                <span style="font-size:12px; font-weight:400; opacity:.85;">пустая позиция — выбрать материал, размер, тираж</span>
+            </button>
+            <button class="btn btn-outline" style="padding:16px; display:flex; flex-direction:column; align-items:flex-start; gap:4px; text-align:left; border-color: var(--primary); color: var(--primary);" onclick="chooseAddKind('template')">
+                <span style="font-size:16px;">📋 Типовая</span>
+                <span style="font-size:12px; font-weight:400;">готовая из списка, с поиском (${(appData.positionTemplates || []).length} шт.)</span>
+            </button>
+        </div>`;
+}
+function chooseAddKind(kind) {
+    document.getElementById('addChoiceModal').style.display = 'none';
+    if (kind === 'template') openTemplatePicker(addStartTarget, true);
+    else addPosition(true, addStartTarget);
 }
 function renderAddChoice(title) {
     const { items } = computeNumbering();
@@ -3557,7 +3607,7 @@ function renderPositions() {
                 <span class="pos-title">Позиция №${numbering.labels[pos.id]}: ${pos.templateName ? `📋 ${escapeHtml(pos.templateName)} · ` : ''}${escapeHtml(calc.mat.name)}</span>
                 <div style="display:flex; gap:8px; flex-wrap: wrap; justify-content: flex-end;">
                     ${linkControlsHtml(pos, numbering)}
-                    <button class="btn btn-outline" onclick="savePositionAsTemplate(${pos.id})" title="Сохранить настройки этой позиции как типовую (шаблон), чтобы потом добавлять её одной кнопкой «📋 Типовая позиция»">⭐ В типовые</button>
+                    <button class="btn btn-outline" onclick="savePositionAsTemplate(${pos.id})" title="Сохранить настройки этой позиции как типовую (шаблон), чтобы потом добавлять её через «➕ Добавить позицию» → «📋 Типовая»">⭐ В типовые</button>
                     <button class="btn btn-danger" onclick="removePosition(${pos.id})">🗑 Удалить</button>
                 </div>
             </div>
