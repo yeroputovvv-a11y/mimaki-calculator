@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Калькулятор Mimaki UJ330H-160</title>
+    <title>Калькулятор УФ-печати RaiPoli</title>
     <!-- Иконка принтера для вкладки браузера -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖨️</text></svg>">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -62,6 +62,18 @@
         .size-group { background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--border); grid-column: span 2; display: flex; flex-direction: column; gap: 8px; }
         .size-group-title { font-size: 11px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; }
         .size-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .duplex-group { grid-column: 1 / -1 !important; }
+        body.main-version .test-only { display: none !important; }
+        body.test-version .main-only { display: none !important; }
+        .link-group { border: 2px solid #0ea5e9; border-radius: 14px; padding: 14px 14px 2px; margin-bottom: 22px; background: #f0f9ff; }
+        .link-group > .position-card { margin-bottom: 12px; border-left: 4px solid #0ea5e9; }
+        .link-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
+        .link-head .form-group { margin: 0; }
+        .link-head .form-control { padding: 6px 8px; }
+        .link-title { font-size: 17px; font-weight: 700; color: #0369a1; }
+        .link-total { margin-left: auto; text-align: right; font-weight: 700; font-size: 18px; color: #0369a1; }
+        .link-total small { display: block; font-weight: 400; font-size: 12px; color: var(--text-muted); }
+        .duplex-group .size-inputs { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
         
         @media (max-width: 768px) {
             .size-group { grid-column: span 1; }
@@ -202,12 +214,19 @@
     </style>
 </head>
 <body>
+<script>
+// ОДИН ИСХОДНЫЙ ФАЙЛ на две версии: uf.html (тестовая) и index.html (рабочая).
+// index.html получается из uf.html заменой этой строки на false и <title>.
+const IS_TEST_VERSION = false;
+document.body.classList.add(IS_TEST_VERSION ? 'test-version' : 'main-version');
+</script>
 
 <div class="container">
     <header>
         <div class="header-title">
-            <h1>Mimaki UJ330H-160 | Калькулятор заказов</h1>
+            <h1>УФ-печать RaiPoli | Калькулятор заказов</h1>
             <p>Единая метрическая система (Метры) | Округление до 50 грн</p>
+            <p class="test-only" style="margin-top:6px; padding:6px 10px; background:#fef3c7; border:1px solid #fcd34d; border-radius:6px; color:#92400e; font-size:12px;">🧪 <strong>Тестовая версия: два принтера (Mimaki UJ330H-160 + Arizona 360 GT).</strong> Рабочая версия — <a href="./" style="color:#92400e;">здесь</a>. Прайс, настройки, счётчик и проекты здесь <strong>отдельные</strong> (тестовый прайс на Drive) — эксперименты не влияют на рабочую версию.</p>
         </div>
         <div class="currency-bar">
             <span>Валюта: <strong id="currentBaseCurrency" class="badge">UAH</strong></span>
@@ -219,7 +238,7 @@
 
     <div class="toolbar">
         <div class="group">
-            <button class="btn btn-primary" onclick="addPosition()">➕ Добавить позицию</button>
+            <button class="btn btn-primary" onclick="openAddPositionChoice()">➕ Добавить позицию</button>
             <button class="btn btn-outline" style="border-color: var(--danger); color: var(--danger);" onclick="startNewOrder()" title="Очистить все позиции и начать новый расчет">🆕 Новый заказ</button>
             
             <input type="text" id="orderClientName" class="form-control" placeholder="Название заказа / Имя клиента" style="width: 250px; font-weight: 600;" onchange="appData.orderName = this.value; appData.isSavedToFile = false; saveAppData();" title="Это название будет использовано в файлах экспорта и в PDF">
@@ -306,7 +325,7 @@
                 <input type="number" step="0.01" id="cfgUsdRate" class="form-control" value="45.00" onchange="updateAdminConfig()"></div>
             <div class="form-group"><label>Курс EUR / UAH:</label>
                 <input type="number" step="0.01" id="cfgEurRate" class="form-control" value="53.00" onchange="updateAdminConfig()"></div>
-            <div class="form-group"><label>Чернила Mimaki LUS-210 (1 л, грн):</label>
+            <div class="form-group"><label>Чернила Mimaki (1 л, грн):</label>
                 <input type="number" id="cfgInkPrice" class="form-control" value="4626.00" onchange="updateAdminConfig()"></div>
             <div class="form-group"><label>Праймирование PR-200 (грн/м²):</label>
                 <input type="number" id="cfgPrimerCostM2" class="form-control" value="15.00" onchange="updateAdminConfig()"></div>
@@ -314,10 +333,53 @@
                 <input type="number" id="cfgOperatorSalary" class="form-control" value="200.00" onchange="updateAdminConfig()"></div>
             <div class="form-group"><label>Аренда за 30 м² (грн/мес):</label>
                 <input type="number" id="cfgRentMonth" class="form-control" value="6000.00" onchange="updateAdminConfig()"></div>
-            <div class="form-group"><label>Стоимость принтера (грн):</label>
+            <div class="form-group"><label>Стоимость принтера Mimaki (грн):</label>
                 <input type="number" id="cfgEquipCost" class="form-control" value="2600000.00" onchange="updateAdminConfig()"></div>
-            <div class="form-group"><label>Срок амортизации (м²):</label>
+            <div class="form-group"><label>Срок амортизации Mimaki (м²):</label>
                 <input type="number" id="cfgAmortM2" class="form-control" value="30000" onchange="updateAdminConfig()"></div>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 14px 0 6px;"><strong>Принтеры и их ограничения.</strong> Ограничения нужны, чтобы калькулятор сам подбирал принтер и предупреждал, если заказ не помещается.</p>
+        <div class="modal-grid">
+            <div class="form-group"><label>Mimaki: макс. ширина рулона / листа (м):</label>
+                <input type="number" step="0.01" id="cfgMimakiMaxWidth" class="form-control" onchange="updateAdminConfig()"></div>
+            <div class="form-group"><label>Mimaki: макс. длина листа (м):</label>
+                <input type="number" step="0.01" id="cfgMimakiMaxSheetLen" class="form-control" onchange="updateAdminConfig()"></div>
+            <div class="form-group"><label>Mimaki, лист: поле от края заготовки (мм):</label>
+                <input type="number" step="1" id="cfgMimakiMargin" class="form-control" title="В листовом режиме Mimaki не печатает в край — нельзя пачкать вакуумный конвейер" onchange="updateAdminConfig()"></div>
+            <div class="form-group"><label>Arizona: область печати, ширина (м):</label>
+                <input type="number" step="0.01" id="cfgArizonaW" class="form-control" onchange="updateAdminConfig()"></div>
+            <div class="form-group"><label>Arizona: область печати, длина (м):</label>
+                <input type="number" step="0.01" id="cfgArizonaL" class="form-control" onchange="updateAdminConfig()"></div>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 14px 0 6px;"><strong>Себестоимость печати по принтерам.</strong> Пустое поле у Arizona = «как у Mimaki». Сейчас всё одинаково; когда появятся реальные цифры (дешевле краска и машина, но чаще ремонты) — заполните, и цена позиции будет зависеть от выбранного принтера. Скорость и расход краски — множители к режимам печати (раздел 3). Поправка — множитель на всю себестоимость печати (ремонты, простои).</p>
+        <div class="modal-grid">
+            <div class="form-group"><label>Mimaki: поправка себестоимости (×):</label>
+                <input type="number" step="0.01" id="cfgMimakiCostFactor" class="form-control" onchange="updateAdminConfig()"></div>
+            <div class="form-group"><label>Arizona: чернила (1 л, грн):</label>
+                <input type="number" id="cfgAzInk" class="form-control" onchange="updateAdminConfig()"></div>
+            <div class="form-group"><label>Arizona: стоимость принтера (грн):</label>
+                <input type="number" id="cfgAzEquip" class="form-control" onchange="updateAdminConfig()"></div>
+            <div class="form-group"><label>Arizona: срок амортизации (м²):</label>
+                <input type="number" id="cfgAzAmort" class="form-control" onchange="updateAdminConfig()"></div>
+            <div class="form-group"><label>Arizona: мощность принтера (кВт):</label>
+                <input type="number" step="0.01" id="cfgAzPower" class="form-control" onchange="updateAdminConfig()"></div>
+            <div class="form-group"><label>Arizona: скорость относительно Mimaki (×):</label>
+                <input type="number" step="0.01" id="cfgAzSpeed" class="form-control" title="1 — как Mimaki; 0,8 — на 20% медленнее (больше времени, ЗП, аренды)" onchange="updateAdminConfig()"></div>
+            <div class="form-group"><label>Arizona: расход краски относительно Mimaki (×):</label>
+                <input type="number" step="0.01" id="cfgAzInkFactor" class="form-control" onchange="updateAdminConfig()"></div>
+            <div class="form-group"><label>Arizona: поправка себестоимости (×):</label>
+                <input type="number" step="0.01" id="cfgAzCostFactor" class="form-control" title="Например 1,1 — себестоимость печати на 10% выше из-за ремонтов и простоев" onchange="updateAdminConfig()"></div>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 14px 0 6px;"><strong>Двусторонняя печать.</strong> Простая — заготовку переворачивают и печатают вторую сторону (таблички, заранее нарезанные листы). Точная (визитки и т.п.) — после лицевой стороны порезка по меткам насквозь для точного угла, затем повторная приладка и печать второй стороны. Каким ножом резать, задаётся у материала (раздел 4, столбец «Нож для порезки насквозь»): флюгерный — картон, бумага; вибронож — ПВХ, ПЕТ, переплётный картон. Здесь выберите, какая работа соответствует каждому ножу. Приладка второй стороны = обычная приладка × коэффициент.</p>
+        <div class="modal-grid">
+            <div class="form-group"><label>Приладка 2-й стороны, простая (× обычной):</label>
+                <input type="number" step="0.1" id="cfgDuplexSimpleSetup" class="form-control" onchange="updateAdminConfig()"></div>
+            <div class="form-group"><label>Приладка 2-й стороны, точная (× обычной):</label>
+                <input type="number" step="0.1" id="cfgDuplexPreciseSetup" class="form-control" onchange="updateAdminConfig()"></div>
+            <div class="form-group" style="grid-column: span 2;"><label>Точная, порезка насквозь <strong>флюгерным ножом</strong> (картон, бумага…):</label>
+                <select id="cfgDuplexCutDrag" class="form-control" onchange="updateAdminConfig()"></select></div>
+            <div class="form-group" style="grid-column: span 2;"><label>Точная, порезка насквозь <strong>виброножом</strong> (ПВХ, ПЕТ, переплётный картон…):</label>
+                <select id="cfgDuplexCutVibro" class="form-control" onchange="updateAdminConfig()"></select></div>
         </div>
 
         <div class="modal-section" style="margin-top: 30px;">2. Коммерческие наценки печати</div>
@@ -339,8 +401,9 @@
             <table class="mat-table">
                 <thead>
                     <tr>
-                        <th style="width: 22%;">Режим</th>
-                        <th style="width: 20%;">Описание</th>
+                        <th style="width: 20%;">Режим</th>
+                        <th style="width: 18%;" title="Как режим называется в PDF для клиента. Пусто — обычное название">Для клиента (укр.)</th>
+                        <th style="width: 14%;">Описание</th>
                         <th style="width: 14%;">Скорость, м²/ч</th>
                         <th style="width: 16%;">Расход чернил, мл/м²</th>
                         <th style="width: 18%;">Заводское значение</th>
@@ -400,6 +463,7 @@
                     <tr>
                         <th class="move-th" title="Порядок строк: перетащите строку за ⠿ или нажимайте ▲ ▼. Порядок здесь = порядок в списках у менеджера">↕</th>
                         <th style="width: 24%;">Название материала</th>
+                        <th style="min-width: 220px;" title="Как материал называется в PDF для клиента. Пусто — берётся обычное название">Название для клиента (укр.)</th>
                         <th style="width: 11%;" title="От группы зависит, какие доп. работы предлагаются менеджеру для этого материала">Группа (для доп. работ)</th>
                         <th style="width: 10%;">Тип по умолч.</th>
                         <th style="width: 12%;">Цена за м²</th>
@@ -410,6 +474,7 @@
                         <th style="width: 9%;">Приладка рулон, переопр.</th>
                         <th style="width: 9%;">Приладка лист, переопр.</th>
                         <th style="width: 5%;">Праймер</th>
+                        <th style="min-width: 150px;" title="Для точной двусторонней печати: чем резать насквозь по меткам лицевой стороны">Нож для порезки насквозь</th>
                         <th style="width: 4%;">Удал.</th>
                     </tr>
                 </thead>
@@ -451,6 +516,7 @@
                         <th class="move-th" title="Порядок строк: перетащите строку за ⠿ или нажимайте ▲ ▼. Порядок здесь = порядок в списках у менеджера">↕</th>
                         <th style="min-width: 150px;">Вид</th>
                         <th style="min-width: 230px;">Название</th>
+                        <th style="min-width: 200px;" title="Как расходник называется в PDF для клиента. Пусто — обычное название">Название для клиента (укр.)</th>
                         <th style="min-width: 70px;">Ширина, мм</th>
                         <th style="min-width: 70px;">Толщина, мм</th>
                         <th style="min-width: 130px;">Состав / примечание</th>
@@ -489,6 +555,7 @@
                     <tr>
                         <th class="move-th" title="Порядок строк: перетащите строку за ⠿ или нажимайте ▲ ▼. Порядок здесь = порядок в списках у менеджера">↕</th>
                         <th style="min-width: 260px;">Название работы</th>
+                        <th style="min-width: 230px;" title="Как работа называется в PDF для клиента. Пусто — обычное название">Название для клиента (укр.)</th>
                         <th style="min-width: 200px;">Для групп материалов</th>
                         <th style="min-width: 150px;">Единица расчёта</th>
                         <th style="min-width: 80px;">Цена за ед., грн</th>
@@ -508,7 +575,28 @@
             <div class="more-hint"><span></span></div>
         </div>
 
-        <div class="modal-section" style="margin-top: 30px;">☁️ 6. Google Drive: общий прайс</div>
+        <div class="modal-section" style="margin-top: 30px;">📋 Типовые позиции (шаблоны)</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Готовые позиции для частых задач (А1/А2 на картоне, печать на ручках, ХДФ нужного размера, двусторонние визитки…). Менеджер добавляет их кнопкой «➕ Добавить позицию» → «📋 Типовая» (с поиском) и вводит только тираж. Создать: настройте позицию в заказе → «⭐ В типовые». Изменить настройки: добавьте типовую в заказ, поправьте, снова «⭐ В типовые» → «Обновить». Здесь — названия, разделы, порядок и удаление.</p>
+        <div class="table-scroll-wrap"><div class="table-scroll" data-freeze="1">
+            <table class="mat-table">
+                <thead>
+                    <tr>
+                        <th style="min-width: 220px;">Название</th>
+                        <th style="min-width: 140px;">Раздел</th>
+                        <th style="min-width: 320px;">Что внутри</th>
+                        <th style="min-width: 70px;">Порядок</th>
+                        <th style="min-width: 40px;">Удал.</th>
+                    </tr>
+                </thead>
+                <tbody id="templatesTableBody"></tbody>
+            </table>
+            </div>
+            <div class="more-hint"><span></span></div>
+        </div>
+
+        <div class="modal-section test-only" style="margin-top: 30px;">☁️ 6. Google Drive: ТЕСТОВЫЙ прайс</div>
+        <div class="modal-section main-only" style="margin-top: 30px;">☁️ 6. Google Drive: общий прайс</div>
+        <p class="warning-box test-only" style="font-size: 13px;">🧪 Это тестовая версия. «Опубликовать» и «Обновить» работают с отдельным файлом <strong>Mimaki_ТЕСТ_2принтера_Прайс.json</strong>. Рабочий прайс отсюда не меняется. Чтобы начать заново с цен рабочей версии — <button class="btn btn-outline btn-sm" onclick="copyPriceFromMainVersion()">📥 Взять прайс из рабочей версии</button> (заменит цены в этом браузере; потом «☁️ Опубликовать прайс» — в тестовый файл).</p>
         <div style="margin-bottom: 15px;">
             <span class="cloud-indicator" id="cloudIndicator">☁️ Drive не настроен</span>
         </div>
@@ -537,6 +625,35 @@
 
 <div id="printClientDiv"></div>
 
+<!-- Добавление: отдельная позиция или связанная -->
+<div class="modal" id="addChoiceModal">
+    <div class="modal-content" style="max-width: 560px;">
+        <div class="modal-header">
+            <h2 id="addChoiceTitle">Новая позиция</h2>
+            <button class="btn btn-outline" onclick="document.getElementById('addChoiceModal').style.display='none'">✕</button>
+        </div>
+        <div id="addChoiceList"></div>
+        <p style="font-size:12px; color:var(--text-muted); margin-top:12px;">Индивидуальная — пустая позиция, всё задаётся вручную. Типовая — готовая из списка (найдите поиском; если нужной нет — кнопка «✏️ Нет нужной — индивидуальная»). Связанные позиции — одно изделие (например, плёнка с печатью + ПВХ без печати с прикаткой и порезкой = табличка): общий номер, размер, тираж, уровень цен, срок и скидка.</p>
+    </div>
+</div>
+
+<!-- Выбор типовой позиции (шаблона) -->
+<div class="modal" id="templatePickerModal">
+    <div class="modal-content" style="max-width: 760px;">
+        <div class="modal-header">
+            <h2>📋 Типовые позиции</h2>
+            <button class="btn btn-outline" onclick="closeTemplatePicker()">✕</button>
+        </div>
+        <div id="templateTargetInfo" style="font-size:12px; color:#0369a1; margin-bottom:6px;"></div>
+        <div style="display:flex; gap:8px; margin-bottom: 12px;">
+            <input type="text" id="templateSearch" class="form-control" placeholder="Поиск: картон, А2, ручки, ХДФ…" oninput="renderTemplatePicker()">
+            <button class="btn btn-outline" style="white-space:nowrap;" onclick="templatePickerToCustom()" title="Нужной типовой нет — добавить пустую индивидуальную позицию">✏️ Нет нужной — индивидуальная</button>
+        </div>
+        <div id="templatePickerList" style="max-height: 55vh; overflow-y: auto;"></div>
+        <p style="font-size:12px; color:var(--text-muted); margin-top: 12px;">Как пополнить список типовых: настройте обычную позицию (материал, размеры, принтер, режим, двусторонняя печать, доп. работы) и нажмите в ней «⭐ В типовые». Список и названия правятся в Админке, раздел «📋 Типовые позиции». Типовые позиции хранятся в прайсе — после изменений опубликуйте прайс.</p>
+    </div>
+</div>
+
 <div class="modal" id="googleDriveModal">
     <div class="modal-content" style="max-width: 720px;">
         <div class="modal-header">
@@ -551,7 +668,7 @@
         <div class="form-group" style="margin-bottom: 15px;">
             <label>ID общего файла прайса:</label>
             <input type="text" id="cfgGooglePriceFileId" class="form-control" placeholder="Вставьте ID или ссылку Google Drive">
-            <div id="nonDefaultPriceWarning" class="warning-box" style="display:none; margin-top:8px;">⚠️ Этот браузер подключён НЕ к стандартному общему прайсу. Коллеги работают со стандартным файлом и ваших правок не увидят. <button class="btn btn-outline" style="margin-top:6px;" onclick="resetPriceFileToDefault()">↩️ Вернуть стандартный общий прайс</button></div>
+            <div id="nonDefaultPriceWarning" class="warning-box" style="display:none; margin-top:8px;">⚠️ Этот браузер подключён НЕ к стандартному прайсу этой версии. <button class="btn btn-outline" style="margin-top:6px;" onclick="resetPriceFileToDefault()">↩️ Вернуть стандартный прайс</button></div>
         </div>
         <p style="font-size:12px; color:var(--text-muted); margin-bottom: 18px;">Client ID не является секретом. Он привязан к адресу, на котором открыт калькулятор. После изменения Client ID перезагрузите страницу.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -625,11 +742,11 @@
  * приладка по рулону/листу с переопределением по материалу, инженерный
  * раздел калибровки режимов печати)
  */
-const STORAGE_KEY = 'mimaki-app-state-v13';
+const STORAGE_KEY = IS_TEST_VERSION ? 'mimaki-app-state-v13-2p' : 'mimaki-app-state-v13'; // у тестовой версии своя копия
 // Ключ предыдущей версии калькулятора — нужен только для одноразового переноса
 // данных (материалы, позиции, настройки), сохранённых до обновления на v13.
-const LEGACY_STORAGE_KEY = 'mimaki-app-state-v12';
-const GOOGLE_DRIVE_SETTINGS_KEY = 'mimaki-google-drive-settings-v1';
+const LEGACY_STORAGE_KEY = IS_TEST_VERSION ? 'mimaki-app-state-v12-2p-unused' : 'mimaki-app-state-v12'; // тестовой версии перенос из v12 не нужен
+const GOOGLE_DRIVE_SETTINGS_KEY = IS_TEST_VERSION ? 'mimaki-google-drive-settings-v1-2p' : 'mimaki-google-drive-settings-v1';
 // Полный scope нужен только потому, что общий файл создаётся одним аккаунтом и
 // редактируется другими по прямой ссылке. Приложение обращается только к ID,
 // указанным в настройках, и не выводит список содержимого Drive.
@@ -641,7 +758,14 @@ const GOOGLE_DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
 // для публичного использования на стороне браузера, а доступ к файлу прайса
 // определяется правами на Google Drive, а не знанием его ID.
 const DEFAULT_GOOGLE_CLIENT_ID = '94907071030-b7efl59619cv8avhuok6lnrfj2rvq7l9.apps.googleusercontent.com';
-const DEFAULT_GOOGLE_PRICE_FILE_ID = '1uWt0mazZFZj7hoAVH8gkFkzKKKHLIQxN';
+// Тестовая версия работает со СВОИМ файлом прайса (копия рабочего от 22.11.2026).
+// Рабочий файл она только читает — по кнопке «Взять прайс из рабочей версии» — и
+// никогда в него не пишет.
+const TEST_PRICE_FILE_ID = '1H8lx8nxdlccGf8-LS51cXHyWeRqe9Ibj'; // Mimaki_ТЕСТ_2принтера_Прайс.json
+const MAIN_PRICE_FILE_ID = '1uWt0mazZFZj7hoAVH8gkFkzKKKHLIQxN'; // Mimaki_Общий_Прайс.json (рабочий; тестовой версии — только чтение)
+const DEFAULT_GOOGLE_PRICE_FILE_ID = IS_TEST_VERSION ? TEST_PRICE_FILE_ID : MAIN_PRICE_FILE_ID;
+const TEST_ORDER_COUNTER_NAME = IS_TEST_VERSION ? 'Mimaki_ТЕСТ_Order_Counter.json' : 'Mimaki_Order_Counter.json';
+const TEST_PROJECT_PREFIX = IS_TEST_VERSION ? 'Mimaki_ТЕСТ_Проект_' : 'Mimaki_Проект_';
 
 let googleDriveSettings = loadGoogleDriveSettings();
 const driveState = {
@@ -662,13 +786,30 @@ const driveState = {
 // после перезагрузки страницы калькулятор «забывал» и то, и другое — публикация
 // требовала заново обновить прайс (что стирало правки), а фоновое автообновление
 // могло молча заменить неопубликованные правки общей версией.
-const PRICE_BASE_KEY = 'mimaki-price-base-v1';
+const PRICE_BASE_KEY = IS_TEST_VERSION ? 'mimaki-price-base-v1-2p' : 'mimaki-price-base-v1';
+
+// Тестовая версия «два принтера» (uf.html) живёт рядом с рабочей (index.html) на том же
+// сайте. Чтобы две вкладки не перезаписывали друг другу данные в браузере, у неё свои
+// ключи хранения. При первом открытии берём копию данных рабочей версии.
+(function copyFromMainVersionOnce() {
+    try {
+        if (IS_TEST_VERSION && !localStorage.getItem(STORAGE_KEY) && localStorage.getItem('mimaki-app-state-v13')) {
+            // Одна копия при первом открытии. Дальше версии живут отдельно. Номер заказа
+            // не переносим: у тестовой версии свой счётчик. Версию прайса не переносим:
+            // у тестовой версии другой файл прайса на Drive.
+            const state = JSON.parse(localStorage.getItem('mimaki-app-state-v13'));
+            state.orderNumber = null;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }
+    } catch (_) { /* хранилище недоступно */ }
+})();
 
 function persistPriceBase() {
     try {
         localStorage.setItem(PRICE_BASE_KEY, JSON.stringify({
             fileId: googleDriveSettings.priceFileId || '',
             version: driveState.priceVersion,
+            updatedAt: driveState.priceUpdatedAt || null,
             dirty: Boolean(driveState.priceDirty)
         }));
     } catch (_) { /* хранилище недоступно — работаем как раньше */ }
@@ -679,6 +820,7 @@ function persistPriceBase() {
         const saved = JSON.parse(localStorage.getItem(PRICE_BASE_KEY) || 'null');
         if (saved && saved.fileId && saved.fileId === googleDriveSettings.priceFileId) {
             driveState.priceVersion = saved.version || null;
+            driveState.priceUpdatedAt = saved.updatedAt || null;
             driveState.priceDirty = Boolean(saved.dirty);
         }
     } catch (_) { /* нет сохранённых данных */ }
@@ -689,7 +831,8 @@ function loadGoogleDriveSettings() {
         const saved = JSON.parse(localStorage.getItem(GOOGLE_DRIVE_SETTINGS_KEY) || '{}');
         return {
             clientId: typeof saved.clientId === 'string' && saved.clientId ? saved.clientId : DEFAULT_GOOGLE_CLIENT_ID,
-            priceFileId: typeof saved.priceFileId === 'string' && saved.priceFileId ? saved.priceFileId : DEFAULT_GOOGLE_PRICE_FILE_ID,
+            // Рабочий файл прайса тестовой версии запрещён — только тестовый.
+            priceFileId: typeof saved.priceFileId === 'string' && saved.priceFileId && !(IS_TEST_VERSION && saved.priceFileId === MAIN_PRICE_FILE_ID) ? saved.priceFileId : DEFAULT_GOOGLE_PRICE_FILE_ID,
             projectFileId: typeof saved.projectFileId === 'string' ? saved.projectFileId : ''
         };
     } catch (_) {
@@ -726,8 +869,10 @@ function normalizePosition(raw, index = 0) {
     const material = appData.materials[0] || defaultAppData.materials[0];
     const id = Number(source.id);
     const safeId = Number.isSafeInteger(id) && id > 0 ? id : Date.now() + index;
-    const width = validNumber(source.matWidthM, 1, 0.001);
-    const height = validNumber(source.matHeightM, 1, 0.001);
+    // Пустая (новая, ещё не заполненная) позиция: материал, размер и тираж не заданы (null).
+    const isEmptyVal = v => v === null || v === '' || v === 0;
+    const width = isEmptyVal(source.matWidthM) ? null : validNumber(source.matWidthM, 1, 0.001);
+    const height = isEmptyVal(source.matHeightM) ? null : validNumber(source.matHeightM, 1, 0.001);
     const modeCode = appData.printModes[source.modeCode] ? source.modeCode : material.recommendedMode;
     return {
         id: safeId,
@@ -735,9 +880,9 @@ function normalizePosition(raw, index = 0) {
         effType: source.effType === 'roll' ? 'roll' : 'sheet',
         matWidthM: width,
         matHeightM: height,
-        printWidthM: Math.min(validNumber(source.printWidthM, width, 0.001), width),
-        printHeightM: Math.min(validNumber(source.printHeightM, height, 0.001), height),
-        quantity: Math.max(1, Math.floor(validNumber(source.quantity, 1, 1))),
+        printWidthM: width === null ? null : Math.min(validNumber(source.printWidthM, width, 0.001), width),
+        printHeightM: height === null ? null : Math.min(validNumber(source.printHeightM, height, 0.001), height),
+        quantity: isEmptyVal(source.quantity) ? null : Math.max(1, Math.floor(validNumber(source.quantity, 1, 1))),
         modeCode,
         usePrimer: Boolean(source.usePrimer),
         customScrapRate: validNumber(source.customScrapRate, material.scrapRate, 0),
@@ -747,6 +892,18 @@ function normalizePosition(raw, index = 0) {
         isMediumFormat: Boolean(source.isMediumFormat),
         hasNoStock: Boolean(source.hasNoStock),
         noPrint: Boolean(source.noPrint),
+        printer: ['auto', 'mimaki', 'arizona'].includes(source.printer) ? source.printer : 'auto',
+        edgePrint: Boolean(source.edgePrint),
+        duplex: ['simple', 'precise'].includes(source.duplex) ? source.duplex : 'none',
+        backModeCode: typeof source.backModeCode === 'string' && appData.printModes[source.backModeCode] ? source.backModeCode : '',
+        manualBackSetupFee: source.manualBackSetupFee === null || source.manualBackSetupFee === undefined ? null : validNumber(source.manualBackSetupFee, null, 0),
+        duplexCutOpId: typeof source.duplexCutOpId === 'string' ? source.duplexCutOpId : '',
+        templateId: typeof source.templateId === 'string' ? source.templateId : '',
+        templateName: typeof source.templateName === 'string' ? source.templateName : '',
+        // Связанные позиции (изделие из нескольких позиций, напр. плёнка + ПВХ = табличка):
+        // одинаковый linkId, название изделия — linkName (одинаковое у всех).
+        linkId: typeof source.linkId === 'string' ? source.linkId : '',
+        linkName: typeof source.linkName === 'string' ? source.linkName : '',
         urgency: ['standard', '24h', 'same_day'].includes(source.urgency) ? source.urgency : 'standard',
         discountPercent: Math.min(100, validNumber(source.discountPercent, 0, 0)),
         discountNote: typeof source.discountNote === 'string' ? source.discountNote : '',
@@ -782,7 +939,12 @@ function normalizeMaterial(raw) {
         // названию; администратор потом может поправить в таблице материалов.
         group: MATERIAL_GROUPS.some(g => g.code === source.group) ? source.group : guessMaterialGroup(source.name),
         // Поставщик / номер КП — справочно, чтобы при следующей закупке было понятно, откуда цена.
-        supplier: typeof source.supplier === 'string' ? source.supplier : ''
+        supplier: typeof source.supplier === 'string' ? source.supplier : '',
+        // Название для клиента (укр.) — в PDF; пусто = обычное название.
+        clientName: typeof source.clientName === 'string' ? source.clientName : '',
+        // Нож для порезки насквозь (точная двусторонняя печать): '' — авто по названию/группе,
+        // 'drag' — флюгерный нож (картон, бумага), 'vibro' — вибронож (ПВХ, ПЕТ, переплётный картон).
+        cutKnife: ['drag', 'vibro'].includes(source.cutKnife) ? source.cutKnife : ''
     };
 }
 
@@ -898,14 +1060,15 @@ const WORK_UNITS = [
     // «м² печати» — только напечатанная область (подрезка по контуру, выборка);
     // если позиция «Без печати» — берётся вся заготовка. «м² заготовки» — всегда
     // вся заготовка материала (ламинация до порезки, прикатка на основу).
-    { code: 'area', label: 'м² печати', short: 'м² печати', scope: 'position' },
-    { code: 'blankArea', label: 'м² заготовки', short: 'м² заготовки', scope: 'position' },
-    { code: 'item', label: 'за изделие', short: 'шт', scope: 'position' },
-    { code: 'perimeter', label: 'п.м. по периметру', short: 'п.м.', scope: 'position' },
-    { code: 'grommet', label: 'люверсы по шагу', short: 'шт', scope: 'position' },
-    { code: 'perItem', label: 'шт/линий на изделие', short: 'шт', scope: 'position' },
-    { code: 'hour', label: 'час (на заказ)', short: 'ч', scope: 'order' },
-    { code: 'fixed', label: 'за заказ', short: 'шт', scope: 'order' }
+    // shortUa — единица в PDF для клиента (украинский).
+    { code: 'area', label: 'м² печати', short: 'м² печати', shortUa: 'м² друку', scope: 'position' },
+    { code: 'blankArea', label: 'м² заготовки', short: 'м² заготовки', shortUa: 'м² заготовки', scope: 'position' },
+    { code: 'item', label: 'за изделие', short: 'шт', shortUa: 'шт', scope: 'position' },
+    { code: 'perimeter', label: 'п.м. по периметру', short: 'п.м.', shortUa: 'пог. м', scope: 'position' },
+    { code: 'grommet', label: 'люверсы по шагу', short: 'шт', shortUa: 'шт', scope: 'position' },
+    { code: 'perItem', label: 'шт/линий на изделие', short: 'шт', shortUa: 'шт', scope: 'position' },
+    { code: 'hour', label: 'час (на заказ)', short: 'ч', shortUa: 'год', scope: 'order' },
+    { code: 'fixed', label: 'за заказ', short: 'шт', shortUa: 'шт', scope: 'order' }
 ];
 
 function getWorkUnit(code) {
@@ -996,7 +1159,8 @@ function normalizeConsumable(raw, index = 0) {
         prepCostUah: validNumber(s.prepCostUah, 0, 0),
         inStock: s.inStock === undefined ? true : Boolean(s.inStock),
         hidden: Boolean(s.hidden),
-        supplier: typeof s.supplier === 'string' ? s.supplier : ''
+        supplier: typeof s.supplier === 'string' ? s.supplier : '',
+        clientName: typeof s.clientName === 'string' ? s.clientName : ''
     };
 }
 
@@ -1016,7 +1180,8 @@ function normalizeOperation(raw, index = 0) {
         hasComplexity: Boolean(s.hasComplexity),
         // Шаг люверсов в см (для 'grommet') или количество на изделие по умолчанию (для 'perItem').
         defaultParam: validNumber(s.defaultParam, unit === 'grommet' ? 30 : 1, 0),
-        hidden: Boolean(s.hidden)
+        hidden: Boolean(s.hidden),
+        clientName: typeof s.clientName === 'string' ? s.clientName : ''
     };
 }
 
@@ -1063,13 +1228,38 @@ function markPriceChanged() {
     }
 }
 
+// Берёт текущий рабочий прайс (только чтение) и подставляет его в тестовую версию
+// как неопубликованные правки. Типовые позиции и настройки тестовой версии
+// (лимиты, Arizona, двусторонняя печать) сохраняются.
+async function copyPriceFromMainVersion() {
+    if (!confirm('Заменить цены в тестовой версии ценами из РАБОЧЕГО прайса?\n\nТиповые позиции и настройки принтеров/двусторонней печати останутся. Потом нажмите «☁️ Опубликовать прайс», чтобы записать в тестовый файл.')) return;
+    try {
+        setCloudStatus('читаем рабочий прайс…');
+        const keep = { limits: appData.config.limits, printerCosts: appData.config.printerCosts, duplex: appData.config.duplex, templates: appData.positionTemplates };
+        const remote = await readDriveJson(MAIN_PRICE_FILE_ID);
+        applyPriceSnapshot(remote.data);
+        appData.config.limits = keep.limits;
+        appData.config.printerCosts = keep.printerCosts;
+        appData.config.duplex = keep.duplex;
+        appData.positionTemplates = keep.templates;
+        saveAppData();
+        markPriceChanged();
+        renderPositions();
+        if (document.getElementById('adminModal').style.display === 'flex') openAdminModal();
+        alert('Цены рабочей версии подставлены. Нажмите «☁️ Опубликовать прайс», чтобы сохранить их в тестовый файл.');
+    } catch (error) {
+        setCloudStatus('не удалось прочитать рабочий прайс', 'error');
+        alert(`Не удалось прочитать рабочий прайс: ${error.message}`);
+    }
+}
+
 function updateNonDefaultPriceWarning() {
     const box = document.getElementById('nonDefaultPriceWarning');
     if (box) box.style.display = googleDriveSettings.priceFileId !== DEFAULT_GOOGLE_PRICE_FILE_ID ? 'block' : 'none';
 }
 
 async function resetPriceFileToDefault() {
-    if (!confirm('Подключить этот браузер к стандартному общему прайсу (тому же, что у коллег)?\n\nВаши текущие цены в этом браузере сохранятся как неопубликованные правки. Потом нажмите «☁️ Опубликовать прайс», чтобы отправить их коллегам, или «↻ Обновить прайс», чтобы взять общий.')) return;
+    if (!confirm('Подключить этот браузер к стандартному прайсу этой версии?\n\nВаши текущие цены в этом браузере сохранятся как неопубликованные правки. Потом нажмите «☁️ Опубликовать прайс», чтобы отправить их коллегам, или «↻ Обновить прайс», чтобы взять общий.')) return;
     googleDriveSettings.priceFileId = DEFAULT_GOOGLE_PRICE_FILE_ID;
     saveGoogleDriveSettingsToBrowser();
     driveState.priceVersion = null;
@@ -1242,7 +1432,8 @@ function buildPriceSnapshot() {
         customGroups: appData.customGroups,
         materials: appData.materials,
         consumables: appData.consumables,
-        operations: appData.operations
+        operations: appData.operations,
+        positionTemplates: appData.positionTemplates || []
     };
 }
 
@@ -1287,6 +1478,7 @@ function applyPriceSnapshot(snapshot) {
         ...(snapshot.setupFeeBase || {})
     };
     if (snapshot.printModes && Object.keys(snapshot.printModes).length) appData.printModes = snapshot.printModes;
+    if (Array.isArray(snapshot.positionTemplates)) appData.positionTemplates = normalizeTemplates(snapshot.positionTemplates);
     document.getElementById('currentBaseCurrency').innerText = appData.config.baseCurrency;
     document.getElementById('dispUsdRate').innerText = Number(appData.config.exchangeRates.USD).toFixed(2);
     document.getElementById('dispEurRate').innerText = Number(appData.config.exchangeRates.EUR).toFixed(2);
@@ -1303,7 +1495,7 @@ async function createSharedPriceFile() {
             return;
         }
         setCloudStatus('создаём общий прайс…');
-        const result = await createDriveJson('Mimaki_Общий_Прайс.json', buildPriceSnapshot());
+        const result = await createDriveJson(IS_TEST_VERSION ? 'Mimaki_ТЕСТ_2принтера_Прайс.json' : 'Mimaki_Общий_Прайс.json', buildPriceSnapshot());
         googleDriveSettings.priceFileId = result.metadata.id;
         saveGoogleDriveSettingsToBrowser();
         driveState.priceVersion = result.metadata.version;
@@ -1339,6 +1531,7 @@ async function loadPriceFromDrive(options = {}) {
         const remote = await readDriveJson(googleDriveSettings.priceFileId);
         applyPriceSnapshot(remote.data);
         driveState.priceVersion = remote.metadata.version;
+        driveState.priceUpdatedAt = remote.data && remote.data.updatedAt || null;
         driveState.priceEtag = remote.etag;
         driveState.priceDirty = false;
         persistPriceBase();
@@ -1354,6 +1547,10 @@ async function loadPriceFromDrive(options = {}) {
 }
 
 async function publishPriceToDrive() {
+    if (IS_TEST_VERSION && googleDriveSettings.priceFileId === MAIN_PRICE_FILE_ID) {
+        alert('Тестовая версия не может публиковать в рабочий прайс. Подключите тестовый прайс в «⚙️ Настройки Drive».');
+        return;
+    }
     if (!googleDriveSettings.priceFileId) {
         openGoogleDriveModal();
         alert('Создайте общий прайс или укажите его ID в настройках Drive.');
@@ -1374,12 +1571,29 @@ async function publishPriceToDrive() {
             const metaResponse = await driveFetch(`${GOOGLE_DRIVE_API}/files/${encodeURIComponent(googleDriveSettings.priceFileId)}?fields=version`);
             const meta = await metaResponse.json();
             if (String(meta.version) !== String(driveState.priceVersion)) {
-                const conflict = new Error('version mismatch');
-                conflict.status = 412;
-                throw conflict;
+                // Google Drive иногда увеличивает номер версии уже ПОСЛЕ нашей записи, и
+                // повторная публикация ложно считала, что файл изменил коллега. Проверяем
+                // по содержимому: если в файле наша же последняя версия (та же отметка
+                // времени updatedAt) — конфликта нет. Иначе показываем, кто и когда менял,
+                // и спрашиваем.
+                const remote = await readDriveJson(googleDriveSettings.priceFileId);
+                const ours = driveState.priceUpdatedAt && remote.data && remote.data.updatedAt === driveState.priceUpdatedAt;
+                if (!ours) {
+                    const infoResp = await driveFetch(`${GOOGLE_DRIVE_API}/files/${encodeURIComponent(googleDriveSettings.priceFileId)}?fields=modifiedTime,lastModifyingUser(displayName,me)`);
+                    const info = await infoResp.json();
+                    const who = info.lastModifyingUser ? (info.lastModifyingUser.me ? 'вы (этот же аккаунт Google)' : info.lastModifyingUser.displayName) : 'неизвестно';
+                    const when = info.modifiedTime ? new Date(info.modifiedTime).toLocaleString('ru-RU') : '';
+                    if (!confirm(`Прайс на Drive изменён после того, как вы его загрузили в этой вкладке.\n\nПоследнее изменение: ${when}, ${who}.\n\nОК — всё равно опубликовать вашу версию (если это были вы сами: другая вкладка, другой компьютер или предыдущая публикация).\nОтмена — не публиковать; потом «↻ Обновить прайс» и внести правки заново.`)) {
+                        const conflict = new Error('version mismatch');
+                        conflict.status = 412;
+                        throw conflict;
+                    }
+                }
             }
         }
-        const result = await updateDriveJson(googleDriveSettings.priceFileId, buildPriceSnapshot(), driveState.priceEtag);
+        const snapshot = buildPriceSnapshot();
+        const result = await updateDriveJson(googleDriveSettings.priceFileId, snapshot, driveState.priceEtag);
+        driveState.priceUpdatedAt = snapshot.updatedAt;
         driveState.priceVersion = result.metadata.version;
         driveState.priceEtag = result.etag;
         driveState.priceDirty = false;
@@ -1388,7 +1602,7 @@ async function publishPriceToDrive() {
     } catch (error) {
         if (error.status === 412) {
             setCloudStatus('прайс изменён коллегой — загрузите новую версию', 'warning');
-            alert('Прайс был изменён другим сотрудником. Ваша версия не сохранена, чтобы не затереть его данные. Загрузите актуальный прайс и внесите изменения повторно.');
+            alert('Публикация отменена, ваша версия не сохранена на Drive (правки остались в этом браузере). Чтобы взять версию с Drive — «↻ Обновить прайс» и внести изменения повторно.');
         } else {
             setCloudStatus('не удалось опубликовать прайс', 'error');
             alert(`Не удалось опубликовать прайс: ${error.message}`);
@@ -1400,6 +1614,7 @@ function buildProjectSnapshot() {
     return {
         schema: 'mimaki-project',
         schemaVersion: 4,
+        ...(IS_TEST_VERSION ? { testVersion: '2p' } : {}),
         updatedAt: new Date().toISOString(),
         orderName: appData.orderName,
         orderNumber: appData.orderNumber,
@@ -1446,7 +1661,7 @@ async function getOrCreateOrderNumber() {
     if (appData.orderNumber) return appData.orderNumber;
     try {
         const token = await getGoogleDriveAccessToken();
-        const q = `name = 'Mimaki_Order_Counter.json' and trashed = false and mimeType = 'application/json'`;
+        const q = `name = '${TEST_ORDER_COUNTER_NAME}' and trashed = false and mimeType = 'application/json'`;
         const listResp = await fetch(`${GOOGLE_DRIVE_API}/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=1`, { headers: { Authorization: `Bearer ${token}` } });
         let counterFileId = null;
         if (listResp.ok) {
@@ -1456,14 +1671,14 @@ async function getOrCreateOrderNumber() {
         let nextNumber;
         if (!counterFileId) {
             // Счётчика ещё нигде нет — создаём с первого номера.
-            nextNumber = 1001;
-            const created = await createDriveJson('Mimaki_Order_Counter.json', { lastNumber: nextNumber });
+            nextNumber = IS_TEST_VERSION ? 9001 : 1001; // тестовые заказы: №9001, 9002… — не путаются с рабочими
+            const created = await createDriveJson(TEST_ORDER_COUNTER_NAME, { lastNumber: nextNumber });
             counterFileId = created.metadata.id;
         } else {
             let saved = false;
             for (let attempt = 0; attempt < 5 && !saved; attempt++) {
                 const remote = await readDriveJson(counterFileId);
-                nextNumber = (Number(remote.data && remote.data.lastNumber) || 1000) + 1;
+                nextNumber = (Number(remote.data && remote.data.lastNumber) || (IS_TEST_VERSION ? 9000 : 1000)) + 1;
                 try {
                     await updateDriveJson(counterFileId, { lastNumber: nextNumber }, remote.etag);
                     saved = true;
@@ -1487,7 +1702,7 @@ async function saveProjectToDrive() {
     try {
         await getOrCreateOrderNumber();
         const numberPart = appData.orderNumber ? `№${appData.orderNumber}_` : '';
-        const fileName = `Mimaki_Проект_${numberPart}${getOrderFileNamePrefix()}.json`;
+        const fileName = `${TEST_PROJECT_PREFIX}${numberPart}${getOrderFileNamePrefix()}.json`;
         let result;
         if (googleDriveSettings.projectFileId) {
             if (!driveState.projectEtag || driveState.projectFileId !== googleDriveSettings.projectFileId) {
@@ -1576,7 +1791,7 @@ async function runDriveProjectSearch() {
     resultsEl.innerHTML = '';
     try {
         const results = await searchDriveProjects(query);
-        const projectResults = results.filter(r => r.name && r.name.startsWith('Mimaki_Проект_') || r.matchType === 'id');
+        const projectResults = results.filter(r => r.name && (r.name.startsWith(TEST_PROJECT_PREFIX) || (IS_TEST_VERSION && r.name.startsWith('Mimaki_Проект_'))) || r.matchType === 'id');
         if (!projectResults.length) {
             statusEl.textContent = 'Ничего не найдено. Проверьте написание или используйте поиск по ID/ссылке ниже.';
             return;
@@ -1585,7 +1800,7 @@ async function runDriveProjectSearch() {
         resultsEl.innerHTML = projectResults.map(r => `
             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:6px; margin-bottom:8px;">
                 <div>
-                    <div style="font-weight:600;">${escapeHtml(r.name)}</div>
+                    <div style="font-weight:600;">${escapeHtml(r.name)}${IS_TEST_VERSION && r.name && r.name.startsWith('Mimaki_Проект_') ? ' <span style="font-size:11px; color:var(--warning);">(рабочий — откроется копия)</span>' : ''}</div>
                     <div style="font-size:12px; color:var(--text-muted);">${r.modifiedTime ? new Date(r.modifiedTime).toLocaleString('ru-RU') : ''} ${r.matchType === 'id' ? '· найдено по ID' : ''}</div>
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="loadProjectFromDriveById('${r.id}')">Открыть</button>
@@ -1623,10 +1838,23 @@ async function loadProjectFromDriveById(fileId) {
         appData.discountNote = typeof project.discountNote === 'string' ? project.discountNote : '';
         appData.isSavedToFile = true;
         document.getElementById('orderClientName').value = appData.orderName;
-        googleDriveSettings.projectFileId = fileId;
+        if ((project.testVersion === '2p') === IS_TEST_VERSION) {
+            googleDriveSettings.projectFileId = fileId;
+            driveState.projectFileId = fileId;
+            driveState.projectEtag = remote.etag;
+        } else {
+            // Проект рабочей версии: открываем КОПИЮ. «Сохранить в Drive» создаст новый
+            // тестовый файл с тестовым номером, рабочий файл не меняется.
+            googleDriveSettings.projectFileId = '';
+            driveState.projectFileId = null;
+            driveState.projectEtag = null;
+            appData.orderNumber = null;
+            appData.isSavedToFile = false;
+            setTimeout(() => alert(IS_TEST_VERSION
+                ? 'Открыта копия проекта из РАБОЧЕЙ версии. Рабочий файл не изменится: «Сохранить в Drive» создаст отдельный тестовый проект.'
+                : 'Это проект из ТЕСТОВОЙ версии — открыта копия. Тестовый файл не изменится: «Сохранить в Drive» создаст обычный проект.'), 50);
+        }
         saveGoogleDriveSettingsToBrowser();
-        driveState.projectFileId = fileId;
-        driveState.projectEtag = remote.etag;
         closeDriveProjectPicker();
         renderPositions();
         saveAppData();
@@ -1742,7 +1970,19 @@ const defaultAppData = {
         operatorSalaryHourUah: 200.00, rentMonthUah: 6000.00, monthlyWorkHours: 160,
         equipmentCostUah: 2600000.00, amortTotalM2: 30000,
         markupRetail: 2.50, markupWholesale: 1.80, markupDealer: 1.40,
-        limits: { maxWidthM: 1.61, maxThicknessMm: 50.8 },
+        limits: { maxWidthM: 1.61, maxThicknessMm: 50.8, mimakiMaxSheetLengthM: 2.2, mimakiSheetMarginMm: 10, arizonaMaxWidthM: 1.22, arizonaMaxLengthM: 1.22 },
+        // Себестоимость по принтерам. У Arizona пустое значение (null) = «как у Mimaki».
+        // Коэффициенты: скорость и расход краски — относительно режима печати Mimaki;
+        // «поправка себестоимости» — множитель на всю себестоимость печати (ремонты, простои).
+        printerCosts: {
+            mimaki: { costFactor: 1 },
+            arizona: { inkPriceBottleUah: null, equipmentCostUah: null, amortTotalM2: null, powerPrinterKw: null, speedFactor: 1, inkFactor: 1, costFactor: 1 }
+        },
+        // Двусторонняя печать: приладка второй стороны = обычная приладка × коэффициент;
+        // для точной — работа «порезка по меткам лицевой стороны» (ID из справочника работ).
+        // Нож для порезки насквозь задаётся у материала (флюгерный / вибронож), а здесь —
+        // какая работа из справочника соответствует каждому ножу.
+        duplex: { simpleSetupFactor: 1, preciseSetupFactor: 1, cutOpDrag: '', cutOpVibro: '', preciseCutOpId: '' },
         // Доп. работы: скидка для опта/дилера (%) и коэффициенты сложности
         // (подрезка, выборка и т.п.). Простая сложность — всегда ×1.
         worksTierDiscount: { wholesale: 0, dealer: 0 },
@@ -1827,6 +2067,7 @@ const appData = {
     consumables: JSON.parse(JSON.stringify(defaultAppData.consumables)),
     operations: JSON.parse(JSON.stringify(defaultAppData.operations)),
     customGroups: [],
+    positionTemplates: [], // Типовые позиции (шаблоны): хранятся в прайсе
     positions: [],
     // Услуги на весь заказ (дизайнер, допечатная подготовка): [{opId, qty}]
     orderWorks: [],
@@ -1865,6 +2106,7 @@ function saveAppData() {
                 materials: appData.materials,
                 consumables: appData.consumables,
                 operations: appData.operations,
+                positionTemplates: appData.positionTemplates,
                 positions: appData.positions,
                 orderWorks: appData.orderWorks,
                 servicesDiscountPercent: appData.servicesDiscountPercent,
@@ -1932,6 +2174,7 @@ function loadAppData() {
             appData.materials = normalizeMaterials(p.materials) || appData.materials;
             if (Array.isArray(p.consumables)) appData.consumables = normalizeConsumables(p.consumables);
             if (Array.isArray(p.operations)) appData.operations = normalizeOperations(p.operations);
+            if (Array.isArray(p.positionTemplates)) appData.positionTemplates = normalizeTemplates(p.positionTemplates);
             if (p.positions) appData.positions = normalizePositions(p.positions);
             appData.orderWorks = normalizeOrderWorks(p.orderWorks);
             appData.servicesDiscountPercent = Math.min(100, validNumber(p.servicesDiscountPercent, 0, 0));
@@ -2000,6 +2243,22 @@ function resolveConsumable(op, work) {
     if (chosen && normalizeKind(chosen.kind) === normalizeKind(op.consumableKind)) return chosen;
     const list = consumablesOfKind(op.consumableKind);
     return list[0] || null;
+}
+
+// Названия для PDF клиенту (украинский): «Название для клиента», если заполнено, иначе обычное.
+function clientLabel(obj) {
+    if (!obj) return '';
+    return (typeof obj.clientName === 'string' && obj.clientName.trim()) || obj.name || '';
+}
+function clientConsumableName(c) {
+    if (!c) return '';
+    const parts = [clientLabel(c)];
+    if (c.widthMm) parts.push(`${c.widthMm} мм`);
+    return parts.join(', ');
+}
+function clientUnit(code) {
+    const u = getWorkUnit(code);
+    return u.shortUa || u.short;
 }
 
 function formatConsumableName(c) {
@@ -2119,6 +2378,498 @@ function calculateOrderServices() {
     return { lines, total, discountPercent, discountAmount, finalTotal: total - discountAmount, cost: lines.reduce((s, l) => s + l.cost, 0) };
 }
 
+// --- Себестоимость по принтерам ---
+// Сейчас Arizona считается как Mimaki (все поля пустые, коэффициенты 1). Когда появятся
+// реальные цифры — заполнить в Админке, раздел 1, и цена начнёт зависеть от принтера.
+function optNum(v) {
+    if (v === null || v === undefined || String(v).trim() === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+}
+function printerCostSettings() {
+    const d = defaultAppData.config.printerCosts, saved = appData.config.printerCosts || {};
+    return { mimaki: { ...d.mimaki, ...(saved.mimaki || {}) }, arizona: { ...d.arizona, ...(saved.arizona || {}) } };
+}
+function printerCostParams(code) {
+    const c = appData.config, pc = printerCostSettings();
+    const pick = (v, def, min = 0) => { const n = optNum(v); return n === null || n < min ? def : n; };
+    const base = {
+        code: 'mimaki',
+        inkPriceBottleUah: c.inkPriceBottleUah, equipmentCostUah: c.equipmentCostUah,
+        amortTotalM2: c.amortTotalM2, powerPrinterKw: c.powerPrinterKw,
+        speedFactor: 1, inkFactor: 1, costFactor: pick(pc.mimaki.costFactor, 1)
+    };
+    if (code !== 'arizona') return base;
+    const a = pc.arizona;
+    return {
+        code: 'arizona',
+        inkPriceBottleUah: pick(a.inkPriceBottleUah, base.inkPriceBottleUah),
+        equipmentCostUah: pick(a.equipmentCostUah, base.equipmentCostUah),
+        amortTotalM2: pick(a.amortTotalM2, base.amortTotalM2, 0.000001),
+        powerPrinterKw: pick(a.powerPrinterKw, base.powerPrinterKw),
+        speedFactor: pick(a.speedFactor, 1, 0.01),
+        inkFactor: pick(a.inkFactor, 1),
+        costFactor: pick(a.costFactor, 1)
+    };
+}
+function printerCostDiffers(code) {
+    const a = printerCostParams(code), m = printerCostParams('mimaki');
+    return ['inkPriceBottleUah', 'equipmentCostUah', 'amortTotalM2', 'powerPrinterKw', 'speedFactor', 'inkFactor', 'costFactor'].some(k => a[k] !== m[k]);
+}
+
+// Себестоимость печати одной стороны на 1 м² (без брака, праймера и материала).
+function sidePrintCost(mode, pp, areaM2, timeH) {
+    const c = appData.config;
+    const inkPriceMl = toBase(pp.inkPriceBottleUah, 'UAH') / 1000;
+    const elecPriceKwh = toBase(c.elecTariffKwh, 'UAH');
+    const salaryH = toBase(c.operatorSalaryHourUah, 'UAH');
+    const rentH = toBase(c.rentMonthUah, 'UAH') / c.monthlyWorkHours;
+    const baseAmortM2 = toBase(pp.equipmentCostUah, 'UAH') / pp.amortTotalM2;
+    const speed = mode.speedM2h * pp.speedFactor;
+    const f = pp.costFactor;
+    const inkM2 = mode.inkMlM2 * pp.inkFactor * inkPriceMl * f;
+    const elecTotal = (pp.powerPrinterKw + c.powerClimateWorkKw) * timeH * elecPriceKwh;
+    const elecM2 = areaM2 > 0 ? elecTotal / areaM2 * f : 0;
+    const directOpCostM2 = inkM2 + elecM2;
+    const salaryM2 = areaM2 > 0 ? salaryH * timeH / areaM2 * f : 0;
+    const rentM2 = areaM2 > 0 ? rentH * timeH / areaM2 * f : 0;
+    const amortM2 = baseAmortM2 * (appData.BASE_REFERENCE_SPEED / speed) * f;
+    return { inkM2, elecM2, directOpCostM2, salaryM2, rentM2, amortM2, costNoScrapM2: directOpCostM2 + amortM2 + salaryM2 + rentM2, speed };
+}
+
+// --- Админка: себестоимость принтеров и двусторонняя печать ---
+function fillPrinterCostAndDuplexInputs() {
+    const pc = printerCostSettings(), d = duplexSettings(), c = appData.config;
+    const v = x => x === null || x === undefined ? '' : x;
+    document.getElementById('cfgMimakiCostFactor').value = v(pc.mimaki.costFactor);
+    const az = pc.arizona;
+    const set = (id, val, ph) => { const el = document.getElementById(id); el.value = v(val); el.placeholder = ph; };
+    set('cfgAzInk', az.inkPriceBottleUah, `как Mimaki: ${c.inkPriceBottleUah}`);
+    set('cfgAzEquip', az.equipmentCostUah, `как Mimaki: ${c.equipmentCostUah}`);
+    set('cfgAzAmort', az.amortTotalM2, `как Mimaki: ${c.amortTotalM2}`);
+    set('cfgAzPower', az.powerPrinterKw, `как Mimaki: ${c.powerPrinterKw}`);
+    set('cfgAzSpeed', az.speedFactor, '1');
+    set('cfgAzInkFactor', az.inkFactor, '1');
+    set('cfgAzCostFactor', az.costFactor, '1');
+    document.getElementById('cfgDuplexSimpleSetup').value = d.simpleSetupFactor;
+    document.getElementById('cfgDuplexPreciseSetup').value = d.preciseSetupFactor;
+    const fill = (id, knife, current) => {
+        const auto = (() => { const op = appData.operations.find(o => !o.hidden && getWorkUnit(o.unit).scope !== 'order' && CUT_KNIVES[knife].re.test(o.name)); return op ? op.name : 'не найдена'; })();
+        document.getElementById(id).innerHTML = `<option value="">Авто (по слову «${knife === 'vibro' ? 'вибро' : 'флюгер'}» в названии): ${escapeHtml(auto)}</option>` +
+            appData.operations.filter(op => getWorkUnit(op.unit).scope !== 'order')
+                .map(op => `<option value="${escapeHtml(op.id)}" ${op.id === current ? 'selected' : ''}>${escapeHtml(op.name)} (${escapeHtml(getWorkUnit(op.unit).short)})</option>`).join('');
+    };
+    fill('cfgDuplexCutDrag', 'drag', d.cutOpDrag);
+    fill('cfgDuplexCutVibro', 'vibro', d.cutOpVibro);
+}
+function readPrinterCostAndDuplexInputs() {
+    const c = appData.config, pc = printerCostSettings();
+    const read = (id, min = 0) => { const n = optNum(document.getElementById(id).value); return n === null || n < min ? null : n; };
+    pc.mimaki.costFactor = read('cfgMimakiCostFactor', 0.01) ?? 1;
+    pc.arizona.inkPriceBottleUah = read('cfgAzInk');
+    pc.arizona.equipmentCostUah = read('cfgAzEquip');
+    pc.arizona.amortTotalM2 = read('cfgAzAmort', 0.000001);
+    pc.arizona.powerPrinterKw = read('cfgAzPower');
+    pc.arizona.speedFactor = read('cfgAzSpeed', 0.01) ?? 1;
+    pc.arizona.inkFactor = read('cfgAzInkFactor') ?? 1;
+    pc.arizona.costFactor = read('cfgAzCostFactor', 0.01) ?? 1;
+    c.printerCosts = pc;
+    c.duplex = {
+        ...duplexSettings(),
+        simpleSetupFactor: read('cfgDuplexSimpleSetup') ?? 1,
+        preciseSetupFactor: read('cfgDuplexPreciseSetup') ?? 1,
+        cutOpDrag: document.getElementById('cfgDuplexCutDrag').value || '',
+        cutOpVibro: document.getElementById('cfgDuplexCutVibro').value || ''
+    };
+}
+
+// --- Двусторонняя печать: блок в карточке позиции ---
+function duplexBlockHtml(pos, calc) {
+    const d = calc.duplex;
+    const cut = d === 'precise' ? duplexCutOperation(pos, calc.mat) : null;
+    const ops = appData.operations.filter(op => !op.hidden && getWorkUnit(op.unit).scope !== 'order');
+    const cur = appData.config.baseCurrency;
+    return `<div class="size-group duplex-group" style="border-left: 3px solid #7c3aed; ${d !== 'none' ? 'background:#faf5ff;' : ''}">
+        <div class="size-group-title" style="color:#7c3aed;">Двусторонняя печать</div>
+        <div class="size-inputs">
+            <div class="form-group">
+                <label>Вторая сторона:</label>
+                <select class="form-control user-editable" onchange="updatePosField(${pos.id}, 'duplex', this.value)" title="Простая — перевернуть заготовку и напечатать. Точная — порезка по меткам лицевой стороны для точного угла, повторная приладка, печать второй стороны">
+                    ${Object.keys(DUPLEX_LABELS).map(k => `<option value="${k}" ${d === k ? 'selected' : ''}>${DUPLEX_LABELS[k]}</option>`).join('')}
+                </select>
+            </div>
+            ${d === 'none' ? '' : `<div class="form-group">
+                <label>Режим 2-й стороны:</label>
+                <select class="form-control user-editable" onchange="updatePosField(${pos.id}, 'backModeCode', this.value)">
+                    <option value="" ${!pos.backModeCode ? 'selected' : ''}>Как лицевая</option>
+                    ${Object.keys(appData.printModes).map(k => `<option value="${k}" ${k === pos.backModeCode ? 'selected' : ''}>${escapeHtml(appData.printModes[k].name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Приладка 2-й стороны: ${pos.manualBackSetupFee !== null ? `<button type="button" class="btn btn-outline btn-sm" style="padding:1px 6px; font-size:11px;" onclick="resetManualOverride(${pos.id}, 'manualBackSetupFee')">↺ Авто</button>` : ''}</label>
+                <input type="number" min="0" step="1" class="form-control user-editable ${pos.manualBackSetupFee !== null ? 'highlight-input' : ''}" value="${calc.back.setupFee.toFixed(0)}" onchange="updatePosField(${pos.id}, 'manualBackSetupFee', this.value === '' ? null : Number(this.value))" title="Авто: ${calc.back.calcSetupFee.toFixed(0)} (обычная приладка × коэффициент из админки)">
+            </div>`}
+            ${d === 'precise' ? `<div class="form-group">
+                <label>Порезка по меткам лицевой:</label>
+                <select class="form-control user-editable" onchange="updatePosField(${pos.id}, 'duplexCutOpId', this.value)">
+                    <option value="" ${!pos.duplexCutOpId ? 'selected' : ''}>${escapeHtml(CUT_KNIVES[materialCutKnife(calc.mat)].label)} (по материалу)${cut && !pos.duplexCutOpId ? ': ' + escapeHtml(cut.name) : ''}</option>
+                    ${ops.map(op => `<option value="${escapeHtml(op.id)}" ${op.id === pos.duplexCutOpId ? 'selected' : ''}>${escapeHtml(op.name)}</option>`).join('')}
+                </select>
+            </div>` : ''}
+        </div>
+        ${d === 'precise' && !cut ? `<div style="font-size:12px; color:var(--danger);">Не найдена работа для ножа «${escapeHtml(CUT_KNIVES[materialCutKnife(calc.mat)].label)}» — выберите её в админке, раздел 1.</div>` : ''}
+        ${d === 'none' ? '' : `<div style="font-size:12px; color:#5b21b6; margin-top:4px;">2-я сторона: ${calc.back.area.toFixed(2)} м² (как лицевая), ${calc.back.timeH.toFixed(2)} ч, печать + приладка = ${calc.back.total.toFixed(2)} ${cur}${calc.duplexCut ? ` · порезка по меткам: ${formatQty(calc.duplexCut.qty)} ${calc.duplexCut.unitShort} = ${calc.duplexCut.total.toFixed(2)} ${cur}` : ''}</div>`}
+    </div>`;
+}
+
+// --- Типовые позиции (шаблоны) ---
+function normalizeTemplates(list) {
+    if (!Array.isArray(list)) return [];
+    // Типовая бывает одной позицией (position) или изделием из нескольких связанных (item.positions).
+    return list.filter(t => t && typeof t === 'object' && ((t.position && typeof t.position === 'object') || (t.item && Array.isArray(t.item.positions) && t.item.positions.length))).map((t, i) => {
+        const base = {
+            id: typeof t.id === 'string' && t.id ? t.id : `tpl_${Date.now()}_${i}`,
+            name: typeof t.name === 'string' && t.name.trim() ? t.name.trim() : 'Без названия',
+            section: typeof t.section === 'string' ? t.section.trim() : ''
+        };
+        if (t.item && Array.isArray(t.item.positions) && t.item.positions.length) return { ...base, item: { positions: t.item.positions } };
+        return { ...base, position: t.position };
+    });
+}
+function templateFromPosition(pos) {
+    const copy = JSON.parse(JSON.stringify(pos));
+    delete copy.id; delete copy.templateId; delete copy.templateName; delete copy.linkId; delete copy.linkName;
+    copy.discountPercent = 0; copy.discountNote = '';
+    return copy;
+}
+function templateSummary(t) {
+    if (t.item) {
+        const ps = t.item.positions;
+        const f = ps[0] || {};
+        const parts = ps.map(p => {
+            const mat = appData.materials.find(m => m.id === p.materialId);
+            const works = (p.works || []).map(w => findOperation(w.opId)).filter(Boolean).map(op => op.name);
+            return `${mat ? mat.name : '⚠️ материал удалён'}${p.noPrint ? ' (без печати)' : ''}${works.length ? ' + ' + works.join(', ') : ''}`;
+        });
+        return `🔗 изделие ${f.matWidthM}×${f.matHeightM} м, тираж ${f.quantity || 1}: ` + parts.join(' | ');
+    }
+    const p = t.position || {};
+    const mat = appData.materials.find(m => m.id === p.materialId);
+    const parts = [];
+    parts.push(mat ? mat.name : '⚠️ материал удалён из прайса');
+    parts.push(`заготовка ${p.matWidthM}×${p.matHeightM} м`);
+    if (p.noPrint) parts.push('без печати');
+    else {
+        parts.push(`печать ${p.printWidthM}×${p.printHeightM} м`);
+        const mode = appData.printModes[p.modeCode];
+        if (mode) parts.push(mode.name);
+        if (p.printer === 'mimaki' || p.printer === 'arizona') parts.push(PRINTERS[p.printer].short);
+        if (p.duplex === 'simple' || p.duplex === 'precise') parts.push(p.duplex === 'precise' ? 'двусторонняя точная' : 'двусторонняя простая');
+    }
+    const works = (p.works || []).map(w => findOperation(w.opId)).filter(Boolean).map(op => op.name);
+    if (works.length) parts.push('работы: ' + works.join(', '));
+    parts.push(`тираж ${p.quantity || 1}`);
+    return parts.join(' · ');
+}
+function savePositionAsTemplate(posId) {
+    const pos = appData.positions.find(p => p.id === posId);
+    if (!pos) return;
+    appData.positionTemplates = appData.positionTemplates || [];
+    const existing = pos.templateId ? appData.positionTemplates.find(t => t.id === pos.templateId) : null;
+    if (existing && confirm(`Обновить типовую позицию «${existing.name}» настройками этой позиции?\n\nОК — обновить существующую\nОтмена — сохранить как новую`)) {
+        existing.position = templateFromPosition(pos);
+    } else {
+        const mat = appData.materials.find(m => m.id === pos.materialId);
+        const name = prompt('Название типовой позиции (например «Печать А2 на картоне»):', pos.templateName || (mat ? mat.name : ''));
+        if (!name || !name.trim()) return;
+        const section = prompt('Раздел (необязательно), например «Картон», «Сувенирка», «ХДФ»:', existing ? existing.section : '') || '';
+        const t = { id: `tpl_${Date.now()}`, name: name.trim(), section: section.trim(), position: templateFromPosition(pos) };
+        appData.positionTemplates.push(t);
+        pos.templateId = t.id;
+        pos.templateName = t.name;
+    }
+    markPriceChanged();
+    renderPositions(); saveAppData();
+    alert('Сохранено в типовые позиции.\n\nЧтобы она сохранилась в прайсе на Drive (и появилась у коллег), откройте Админку и нажмите «☁️ Опубликовать прайс».');
+}
+function saveLinkAsTemplate(linkId) {
+    const members = linkMembers(linkId);
+    if (!members.length) return;
+    appData.positionTemplates = appData.positionTemplates || [];
+    const existingId = members[0].templateId && members.every(p => p.templateId === members[0].templateId) ? members[0].templateId : '';
+    const existing = existingId ? appData.positionTemplates.find(t => t.id === existingId && t.item) : null;
+    const positions = members.map(templateFromPosition);
+    let tplName;
+    if (existing && confirm(`Обновить типовое изделие «${existing.name}» текущими позициями?\n\nОК — обновить\nОтмена — сохранить как новое`)) {
+        existing.item = { positions };
+        tplName = existing.name;
+    } else {
+        const name = prompt('Название типового изделия (например «Табличка ПВХ 3 мм с плёнкой»):', members[0].linkName || 'Табличка');
+        if (!name || !name.trim()) return;
+        const section = prompt('Раздел (необязательно), например «Таблички», «Стенды»:', existing ? existing.section : '') || '';
+        const t = { id: `tpl_${Date.now()}`, name: name.trim(), section: section.trim(), item: { positions } };
+        appData.positionTemplates.push(t);
+        members.forEach(p => { p.templateId = t.id; p.templateName = ''; if (!p.linkName) p.linkName = t.name; });
+        tplName = t.name;
+    }
+    markPriceChanged();
+    renderPositions(); saveAppData();
+    alert(`Изделие «${tplName}» сохранено в типовые.\n\nЧтобы оно сохранилось в прайсе на Drive (и появилось у коллег), откройте Админку и нажмите «☁️ Опубликовать прайс».`);
+}
+let templatePickerTarget = null;
+let templatePickerDecided = false;
+function openTemplatePicker(targetPosId = null, decided = false) {
+    templatePickerTarget = targetPosId;
+    templatePickerDecided = decided || targetPosId !== null;
+    const info = document.getElementById('templateTargetInfo');
+    if (info) {
+        const item = targetPosId !== null ? computeNumbering().items.find(it => it.positions.some(p => p.id === targetPosId)) : null;
+        info.textContent = item ? `Добавится в изделие: ${itemLabel(item)}` : (templatePickerDecided ? 'Добавится отдельной позицией заказа' : '');
+    }
+    document.getElementById('templateSearch').value = '';
+    renderTemplatePicker();
+    document.getElementById('templatePickerModal').style.display = 'flex';
+    setTimeout(() => document.getElementById('templateSearch').focus(), 50);
+}
+function closeTemplatePicker() {
+    document.getElementById('templatePickerModal').style.display = 'none';
+}
+// Нужной типовой нет — добавляем пустую индивидуальную туда же (отдельно или в изделие).
+function templatePickerToCustom() {
+    const target = templatePickerTarget;
+    const decided = templatePickerDecided;
+    closeTemplatePicker();
+    if (!decided && appData.positions.length) { openAddPositionChoice(); return; }
+    addPosition(true, target);
+}
+function renderTemplatePicker() {
+    const list = document.getElementById('templatePickerList');
+    const q = document.getElementById('templateSearch').value.trim().toLowerCase();
+    const items = (appData.positionTemplates || []).filter(t => !q || (t.name + ' ' + t.section + ' ' + templateSummary(t)).toLowerCase().includes(q));
+    if (!items.length) {
+        list.innerHTML = `<div style="padding: 16px; color: var(--text-muted);">${(appData.positionTemplates || []).length ? 'Ничего не найдено.' : 'Типовых позиций пока нет. Настройте позицию и нажмите в ней «⭐ В типовые».'}
+            <div style="margin-top:10px;"><button class="btn btn-primary btn-sm" onclick="templatePickerToCustom()">✏️ Добавить индивидуальную позицию</button></div></div>`;
+        return;
+    }
+    const sections = [];
+    items.forEach(t => { const s = t.section || 'Без раздела'; if (!sections.includes(s)) sections.push(s); });
+    list.innerHTML = sections.map(sec => `
+        <div style="font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase; margin: 10px 0 6px;">${escapeHtml(sec)}</div>
+        ${items.filter(t => (t.section || 'Без раздела') === sec).map(t => `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:6px; margin-bottom:8px;">
+                <div>
+                    <div style="font-weight:600;">${escapeHtml(t.name)}</div>
+                    <div style="font-size:12px; color:var(--text-muted);">${escapeHtml(templateSummary(t))}</div>
+                </div>
+                <button class="btn btn-primary btn-sm" style="white-space: nowrap;" onclick="addPositionFromTemplate('${escapeHtml(t.id)}')">➕ Добавить</button>
+            </div>`).join('')}
+    `).join('');
+}
+// targetId — позиция, с которой связать (null — отдельно); decided — выбор уже сделан.
+function addPositionFromTemplate(tplId, targetId = null, decided = false) {
+    const t = (appData.positionTemplates || []).find(x => x.id === tplId);
+    if (!t) return;
+    closeTemplatePicker();
+    if (!decided) {
+        if (templatePickerDecided) { targetId = templatePickerTarget; }
+        else if (appData.positions.length) { pendingTemplateAdd = tplId; renderAddChoice(`Типовая: ${t.name}`); return; }
+    }
+    const rawList = t.item ? t.item.positions : [t.position];
+    const created = rawList.map((rp, i) => {
+        const raw = JSON.parse(JSON.stringify(rp));
+        raw.id = Date.now() + i * 7 + Math.floor(Math.random() * 1000);
+        const pos = normalizePosition(raw);
+        pos.templateId = t.id;
+        pos.templateName = t.item ? '' : t.name;
+        pos.linkId = ''; pos.linkName = '';
+        return pos;
+    });
+    if (t.item && created.length > 1) {
+        const lid = newLinkId();
+        created.forEach(p => { p.linkId = lid; p.linkName = t.name; });
+    }
+    const matOk = created.every(pos => appData.materials.some(m => m.id === pos.materialId));
+    appData.positions.push(...created);
+    if (targetId !== null && targetId !== undefined) {
+        // В изделие целевой позиции; общие параметры (размер, тираж…) — от изделия.
+        created.forEach(pos => attachToLink(pos, Number(targetId), true));
+    }
+    lastAddedPositionId = created[0].id;
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+    if (!matOk) alert(`У типовой «${t.name}» материал удалён из прайса — выберите материал в позиции.`);
+    scrollToPosition(created[0].id);
+}
+function renderTemplatesTable() {
+    const tbody = document.getElementById('templatesTableBody');
+    if (!tbody) return;
+    const list = appData.positionTemplates || [];
+    if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="5" style="color: var(--text-muted); padding: 12px;">Типовых позиций пока нет. Настройте позицию в заказе и нажмите «⭐ В типовые».</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = list.map((t, i) => `<tr>
+        <td><input type="text" class="form-control" value="${escapeHtml(t.name)}" onchange="updateTemplateField(${i}, 'name', this.value)"></td>
+        <td><input type="text" class="form-control" value="${escapeHtml(t.section)}" placeholder="напр. Картон" onchange="updateTemplateField(${i}, 'section', this.value)"></td>
+        <td style="font-size: 12px; color: var(--text-muted);">${escapeHtml(templateSummary(t))}</td>
+        <td style="white-space: nowrap;"><button class="btn btn-outline btn-sm" ${i === 0 ? 'disabled' : ''} onclick="moveTemplate(${i}, -1)">▲</button> <button class="btn btn-outline btn-sm" ${i === list.length - 1 ? 'disabled' : ''} onclick="moveTemplate(${i}, 1)">▼</button></td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteTemplate(${i})">🗑</button></td>
+    </tr>`).join('');
+}
+function updateTemplateField(i, field, value) {
+    const t = (appData.positionTemplates || [])[i];
+    if (!t) return;
+    t[field] = String(value || '').trim();
+    if (field === 'name' && !t.name) t.name = 'Без названия';
+    appData.positions.forEach(p => { if (p.templateId === t.id && field === 'name') p.templateName = t.name; });
+    markPriceChanged(); saveAppData(); renderTemplatesTable(); renderPositions();
+}
+function moveTemplate(i, dir) {
+    const list = appData.positionTemplates || [];
+    const j = i + dir;
+    if (j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    markPriceChanged(); saveAppData(); renderTemplatesTable();
+}
+function deleteTemplate(i) {
+    const t = (appData.positionTemplates || [])[i];
+    if (!t || !confirm(`Удалить типовую позицию «${t.name}»? Позиции в текущем заказе не изменятся.`)) return;
+    appData.positionTemplates.splice(i, 1);
+    markPriceChanged(); saveAppData(); renderTemplatesTable();
+}
+
+// --- Двусторонняя печать ---
+const DUPLEX_LABELS = { none: 'Нет (одна сторона)', simple: 'Простая — перевернуть заготовку', precise: 'Точная — порезка по меткам + повторная приладка' };
+function duplexSettings() {
+    return { ...defaultAppData.config.duplex, ...(appData.config.duplex || {}) };
+}
+const CUT_KNIVES = {
+    drag: { label: 'Флюгерный нож', hint: 'картон, бумага и другие неплотные материалы', re: /флюгер/i },
+    vibro: { label: 'Вибронож', hint: 'ПВХ, ПЕТ, переплётный картон и другие плотные материалы', re: /в[иі]бро/i }
+};
+// Нож материала: задан в таблице материалов или угадан по названию и группе.
+function guessCutKnife(mat) {
+    const name = String(mat && mat.name || '');
+    if (/палітур|палитур|переплет|переплёт|грейборд|пвх|акрил|композит|пенокартон|хдф|мдф|фанер|пластик/i.test(name)) return 'vibro';
+    // ПЕТ отдельно: \b не работает с кириллицей
+    if (/(?:^|[\s,(])(?:пет|pet)(?:[\s,.;)0-9]|$)/i.test(name)) return 'vibro';
+    if (mat && (mat.group === 'pvc' || mat.group === 'acrylic')) return 'vibro';
+    return 'drag';
+}
+function materialCutKnife(mat) {
+    return mat && (mat.cutKnife === 'drag' || mat.cutKnife === 'vibro') ? mat.cutKnife : guessCutKnife(mat);
+}
+// Работа порезки для ножа: выбранная в админке → первая с «флюгер» / «вибро» в названии.
+function cutOperationForKnife(knife) {
+    const usable = op => op && !op.hidden && getWorkUnit(op.unit).scope !== 'order';
+    const d = duplexSettings();
+    const id = knife === 'vibro' ? d.cutOpVibro : d.cutOpDrag;
+    let op = id ? findOperation(id) : null;
+    if (usable(op)) return op;
+    return appData.operations.find(o => usable(o) && CUT_KNIVES[knife].re.test(o.name)) || null;
+}
+// Работа «порезка по меткам лицевой стороны» для точной двусторонней печати:
+// выбранная в позиции → по ножу материала → старая общая настройка → первая «…по меткам…» для группы.
+function duplexCutOperation(pos, mat) {
+    const usable = op => op && !op.hidden && getWorkUnit(op.unit).scope !== 'order';
+    let op = pos.duplexCutOpId ? findOperation(pos.duplexCutOpId) : null;
+    if (usable(op)) return op;
+    op = cutOperationForKnife(materialCutKnife(mat));
+    if (op) return op;
+    const def = duplexSettings().preciseCutOpId;
+    op = def ? findOperation(def) : null;
+    if (usable(op)) return op;
+    return appData.operations.find(o => usable(o) && isOperationForGroup(o, mat.group) && /по\s*мет/i.test(o.name)) || null;
+}
+
+// --- Выбор принтера: Mimaki UJ330H-160 (рулон и лист) или Arizona (только лист, можно в край) ---
+const PRINTERS = {
+    mimaki: { code: 'mimaki', name: 'Mimaki UJ330H-160', short: 'Mimaki' },
+    arizona: { code: 'arizona', name: 'Arizona 360 GT', short: 'Arizona' }
+};
+
+function printerFieldHtml(pos, info) {
+    const sel = info && info.selected ? PRINTERS[info.selected] : null;
+    const autoLabel = sel ? `Авто → ${sel.short}` : 'Авто → не помещается';
+    const status = !info ? '' : (sel
+        ? `<div style="font-size:11px; color:${info.warnings.length ? 'var(--warning)' : 'var(--success)'}; margin-top:3px;">${info.warnings.length ? '⚠️' : '✔'} ${escapeHtml(sel.short)}: ${escapeHtml(info.checks[info.selected].why)}${info.notes.length ? ' · ' + escapeHtml(info.notes.join(' · ')) : ''}</div>`
+        : `<div style="font-size:11px; color:var(--danger); margin-top:3px;">✖ не помещается ни в один принтер</div>`);
+    return `<div class="form-group">
+                    <label>Принтер:</label>
+                    <select class="form-control user-editable" onchange="updatePosField(${pos.id}, 'printer', this.value)" title="Авто: рулон — Mimaki; лист — Arizona, если помещается, иначе Mimaki. Цена зависит от принтера, только если в админке (раздел 1) для Arizona задана своя себестоимость">
+                        <option value="auto" ${pos.printer === 'auto' ? 'selected' : ''}>${escapeHtml(autoLabel)}</option>
+                        <option value="mimaki" ${pos.printer === 'mimaki' ? 'selected' : ''}>Mimaki UJ330H-160${info && info.checks.mimaki.ok ? '' : ' (не подходит)'}</option>
+                        <option value="arizona" ${pos.printer === 'arizona' ? 'selected' : ''}>Arizona 360 GT${info && info.checks.arizona.ok ? '' : ' (не подходит)'}</option>
+                    </select>
+                    ${pos.effType === 'sheet' ? `<label class="checkbox-item" style="margin-top:4px; font-size:12px;" title="Печать без полей, под обрез — только на Arizona"><input type="checkbox" ${pos.edgePrint ? 'checked' : ''} onchange="updatePosField(${pos.id}, 'edgePrint', this.checked)"> Печать в край (под обрез)</label>` : ''}
+                    ${status}
+                </div>`;
+}
+
+function fitsRect(w, l, maxW, maxL) {
+    return (w <= maxW + 1e-9 && l <= maxL + 1e-9) || (l <= maxW + 1e-9 && w <= maxL + 1e-9);
+}
+
+// Ограничения принтеров с подстановкой заводских значений, если в сохранённом
+// прайсе их ещё нет (прайс публиковался из рабочей версии без этих полей).
+function printerLimits() {
+    return { ...defaultAppData.config.limits, ...(appData.config.limits || {}) };
+}
+
+function checkPrinter(code, pos) {
+    const lim = printerLimits();
+    const W = Number(pos.matWidthM) || 0, L = Number(pos.matHeightM) || 0;
+    const pW = Number(pos.printWidthM) || 0, pL = Number(pos.printHeightM) || 0;
+    const cm = v => Math.round(v * 100);
+    if (code === 'mimaki') {
+        if (pos.effType === 'roll') {
+            if (W > lim.maxWidthM + 1e-9) return { ok: false, why: `рулон шире ${cm(lim.maxWidthM)} см` };
+            return { ok: true, why: `рулон до ${cm(lim.maxWidthM)} см` };
+        }
+        if (pos.edgePrint) return { ok: false, why: 'в листовом режиме не печатает в край (нельзя пачкать вакуумный конвейер)' };
+        if (!fitsRect(W, L, lim.maxWidthM, lim.mimakiMaxSheetLengthM)) return { ok: false, why: `лист больше ${cm(lim.maxWidthM)}×${cm(lim.mimakiMaxSheetLengthM)} см` };
+        const m = (Number(lim.mimakiSheetMarginMm) || 0) / 1000;
+        const marginOk = (W - pW) >= 2 * m - 1e-9 && (L - pL) >= 2 * m - 1e-9;
+        return { ok: true, why: 'лист', marginOk, needW: pW + 2 * m, needL: pL + 2 * m };
+    }
+    if (code === 'arizona') {
+        if (pos.effType === 'roll') return { ok: false, why: 'не печатает с рулона' };
+        const aW = lim.arizonaMaxWidthM, aL = lim.arizonaMaxLengthM;
+        if (pos.edgePrint ? !fitsRect(W, L, aW, aL) : !fitsRect(pW, pL, aW, aL)) return { ok: false, why: `${pos.edgePrint ? 'заготовка' : 'печать'} больше ${cm(aW)}×${cm(aL)} см` };
+        return { ok: true, why: pos.edgePrint ? 'лист, печать в край' : 'лист', blankBigger: !fitsRect(W, L, aW, aL) };
+    }
+    return { ok: false, why: '' };
+}
+
+function choosePrinter(pos) {
+    const checks = { mimaki: checkPrinter('mimaki', pos), arizona: checkPrinter('arizona', pos) };
+    const lim = printerLimits();
+    const cm = v => Math.round(v * 100);
+    const warnings = [], notes = [];
+    let selected = null;
+    const auto = pos.printer !== 'mimaki' && pos.printer !== 'arizona';
+    if (auto) {
+        // Рулон — только Mimaki. Лист — Arizona (дешевле краска, печатает в край), иначе Mimaki.
+        if (pos.effType === 'roll') selected = checks.mimaki.ok ? 'mimaki' : null;
+        else selected = checks.arizona.ok ? 'arizona' : (checks.mimaki.ok ? 'mimaki' : null);
+        if (!selected) {
+            warnings.push(`Заказ не помещается ни в один принтер: Mimaki — ${checks.mimaki.why}; Arizona — ${checks.arizona.why}.`);
+            if (pos.edgePrint && pos.effType === 'sheet') warnings.push(`В край печатает только Arizona — до ${cm(lim.arizonaMaxWidthM)}×${cm(lim.arizonaMaxLengthM)} см. Для большего листа снимите «Печать в край»: Mimaki напечатает с полями, затем порезка.`);
+        }
+    } else {
+        selected = pos.printer;
+        if (!checks[selected].ok) warnings.push(`${PRINTERS[selected].name}: ${checks[selected].why}. ${(() => { const other = selected === 'mimaki' ? 'arizona' : 'mimaki'; return checks[other].ok ? `Подходит ${PRINTERS[other].name}.` : ''; })()}`);
+    }
+    if (selected === 'mimaki' && pos.effType === 'sheet' && checks.mimaki.ok && !checks.mimaki.marginOk) {
+        warnings.push(`Mimaki в листовом режиме: нужно поле ${lim.mimakiSheetMarginMm} мм от края с каждой стороны — заготовка должна быть не меньше ${cm(checks.mimaki.needW)}×${cm(checks.mimaki.needL)} см (или уменьшите печать). После печати — порезка.`);
+    }
+    if (selected === 'arizona' && checks.arizona.blankBigger) {
+        notes.push(`заготовка больше ${cm(lim.arizonaMaxWidthM)}×${cm(lim.arizonaMaxLengthM)} см — проверьте, что лист ложится на стол Arizona`);
+    }
+    if (selected === 'arizona' && pos.edgePrint) notes.push('печать в край: сделайте изображение чуть больше заготовки (вылеты)');
+    return { selected, auto, checks, warnings, notes };
+}
+
 function calculatePositionValues(pos) {
     const mat = appData.materials.find(m => m.id === pos.materialId) || appData.materials[0];
     const mode = appData.printModes[pos.modeCode] || appData.printModes.MODE_CMYK_STD;
@@ -2132,27 +2883,16 @@ function calculatePositionValues(pos) {
     const matPieceAreaM2 = pos.matWidthM * pos.matHeightM;
     const matAreaM2 = matPieceAreaM2 * pos.quantity;
 
-    const calcTimeH = printAreaM2 > 0 ? printAreaM2 / mode.speedM2h : 0;
+    // Принтер выбирается до расчёта: от него зависит себестоимость печати.
+    const printerInfo = noPrint ? { selected: null, warnings: [], notes: [], checks: {} } : choosePrinter(pos);
+    const printerCode = printerInfo.selected || (pos.printer === 'arizona' ? 'arizona' : 'mimaki');
+    const pp = printerCostParams(printerCode);
+
+    const calcTimeH = printAreaM2 > 0 ? printAreaM2 / (mode.speedM2h * pp.speedFactor) : 0;
     const effTimeH = noPrint ? 0 : (pos.manualTimeH !== null ? pos.manualTimeH : calcTimeH);
 
-    const inkPriceMl = toBase(appData.config.inkPriceBottleUah, 'UAH') / 1000;
-    const elecPriceKwh = toBase(appData.config.elecTariffKwh, 'UAH');
-    const salaryH = toBase(appData.config.operatorSalaryHourUah, 'UAH');
-    const rentH = toBase(appData.config.rentMonthUah, 'UAH') / appData.config.monthlyWorkHours;
-    const baseAmortM2 = toBase(appData.config.equipmentCostUah, 'UAH') / appData.config.amortTotalM2;
-
-    const inkM2 = mode.inkMlM2 * inkPriceMl;
-    const elecTotal = (appData.config.powerPrinterKw + appData.config.powerClimateWorkKw) * effTimeH * elecPriceKwh;
-    const elecM2 = printAreaM2 > 0 ? elecTotal / printAreaM2 : 0;
-    const directOpCostM2 = inkM2 + elecM2;
-
-    const salaryTotal = salaryH * effTimeH;
-    const rentTotal = rentH * effTimeH;
-    const salaryM2 = printAreaM2 > 0 ? salaryTotal / printAreaM2 : 0;
-    const rentM2 = printAreaM2 > 0 ? rentTotal / printAreaM2 : 0;
-
-    const amortM2 = baseAmortM2 * (appData.BASE_REFERENCE_SPEED / mode.speedM2h);
-    const costNoScrapM2 = directOpCostM2 + amortM2 + salaryM2 + rentM2;
+    const front = sidePrintCost(mode, pp, printAreaM2, effTimeH);
+    const { directOpCostM2, salaryM2, rentM2, amortM2, costNoScrapM2 } = front;
 
     const matBase = toBase(mat.price, mat.currency);
     // Наценка на материал под печатью — только baseMarkup, без умножения на наценку перерасхода
@@ -2189,11 +2929,12 @@ function calculatePositionValues(pos) {
     if (pos.priceTier === 'wholesale') printMarkup = appData.config.markupWholesale;
     if (pos.priceTier === 'dealer') printMarkup = appData.config.markupDealer;
 
-    let printSellM2 = fullCostPriceM2 * printMarkup;
-    if (pos.isMediumFormat) printSellM2 *= 1.15;
-    if (pos.hasNoStock) printSellM2 *= 1.30;
-    if (pos.urgency === '24h') printSellM2 *= 1.30;
-    if (pos.urgency === 'same_day') printSellM2 *= 1.50;
+    let sellFactor = printMarkup;
+    if (pos.isMediumFormat) sellFactor *= 1.15;
+    if (pos.hasNoStock) sellFactor *= 1.30;
+    if (pos.urgency === '24h') sellFactor *= 1.30;
+    if (pos.urgency === 'same_day') sellFactor *= 1.50;
+    const printSellM2 = fullCostPriceM2 * sellFactor;
 
     // Приладка: если у материала задано переопределение (setupFeeRollOverride/setupFeeSheetOverride) —
     // используется оно, иначе — базовое значение из инженерного раздела (appData.setupFeeBase).
@@ -2208,11 +2949,50 @@ function calculatePositionValues(pos) {
     }
     const effSetupFee = noPrint ? 0 : (pos.manualSetupFee !== null ? pos.manualSetupFee : calcSetupFee);
 
-    const printTotal = (printSellM2 * printAreaM2) + effSetupFee;
+    // Вторая сторона: та же площадь печати, свой режим (по умолчанию как лицевая),
+    // своя приладка (обычная × коэффициент из админки). Брак — только печать
+    // (материал уже учтён на лицевой стороне).
+    const dx = duplexSettings();
+    const duplex = noPrint ? 'none' : (['simple', 'precise'].includes(pos.duplex) ? pos.duplex : 'none');
+    let back = null;
+    const duplexWarnings = [];
+    if (duplex !== 'none') {
+        const bMode = appData.printModes[pos.backModeCode] || mode;
+        const bArea = printAreaM2;
+        const bTime = bArea > 0 ? bArea / (bMode.speedM2h * pp.speedFactor) : 0;
+        const sc = sidePrintCost(bMode, pp, bArea, bTime);
+        const bScrapM2 = sc.costNoScrapM2 * pos.customScrapRate;
+        const bFullM2 = sc.costNoScrapM2 + bScrapM2 + primerM2;
+        const bSellM2 = bFullM2 * sellFactor;
+        const setupFactor = validNumber(duplex === 'precise' ? dx.preciseSetupFactor : dx.simpleSetupFactor, 1, 0);
+        const bCalcSetup = calcSetupFee * setupFactor;
+        const bSetup = pos.manualBackSetupFee !== null && pos.manualBackSetupFee !== undefined ? pos.manualBackSetupFee : bCalcSetup;
+        back = {
+            mode: bMode, area: bArea, timeH: bTime, ...sc,
+            scrapCostM2: bScrapM2, primerM2, fullCostPriceM2: bFullM2, printSellM2: bSellM2,
+            calcSetupFee: bCalcSetup, setupFee: bSetup, total: bSellM2 * bArea + bSetup
+        };
+    }
+
+    const printTotal = (printSellM2 * printAreaM2) + effSetupFee + (back ? back.total : 0);
     const matTotal = (matSellM2 * matChargedAreaM2) + wasteCostTotal;
     // Доп. работы входят в сумму позиции ДО округления до 50 грн, и скидка по
     // позиции действует на них так же, как на печать.
     const works = calculatePositionWorks(pos, mat);
+    let duplexCut = null;
+    if (duplex === 'precise') {
+        const cutOp = duplexCutOperation(pos, mat);
+        if (cutOp) {
+            duplexCut = calculateWork(cutOp, { opId: cutOp.id, consumableId: '', complexity: 'simple', qtyOverride: null, param: null }, pos);
+            duplexCut.duplexAuto = true;
+            works.lines.push(duplexCut);
+            works.total += duplexCut.total;
+            works.cost += duplexCut.cost;
+            works.laborCost += duplexCut.laborCost;
+        } else {
+            duplexWarnings.push('⚠️ Точная двусторонняя печать: не найдена работа «порезка по меткам». Выберите её в блоке «Двусторонняя печать» или в админке (раздел 1).');
+        }
+    }
     const worksTotal = works.total;
     const exactGrandTotal = printTotal + matTotal + worksTotal;
     
@@ -2227,11 +3007,12 @@ function calculatePositionValues(pos) {
     const finalTotal = posGrandTotal - discountAmount;
     const finalUnitPrice = pos.quantity > 0 ? finalTotal / pos.quantity : 0;
 
-    const totalInkElec = directOpCostM2 * printAreaM2;
-    const totalAmort = amortM2 * printAreaM2;
-    const totalSalaryRent = (salaryM2 + rentM2) * printAreaM2;
-    const totalPrimer = primerM2 * printAreaM2;
-    const totalScrap = scrapCostM2 * printAreaM2;
+    const bA = back ? back.area : 0;
+    const totalInkElec = directOpCostM2 * printAreaM2 + (back ? back.directOpCostM2 * bA : 0);
+    const totalAmort = amortM2 * printAreaM2 + (back ? back.amortM2 * bA : 0);
+    const totalSalaryRent = (salaryM2 + rentM2) * printAreaM2 + (back ? (back.salaryM2 + back.rentM2) * bA : 0);
+    const totalPrimer = primerM2 * printAreaM2 + (back ? back.primerM2 * bA : 0);
+    const totalScrap = scrapCostM2 * printAreaM2 + (back ? back.scrapCostM2 * bA : 0);
     // Реальная себестоимость материала — вся вырезанная площадь (matAreaM2) по закупочной цене,
     // без каких-либо наценок (наценки — это выручка, а не затраты).
     const totalMatCost = matBase * matAreaM2;
@@ -2246,16 +3027,17 @@ function calculatePositionValues(pos) {
     const scrapFixedPartM2 = (amortM2 + salaryM2 + rentM2) * pos.customScrapRate;
     // Труд на доп. работах — это та же зарплата, поэтому в «валовую наценку»
     // (без ЗП/аренды/амортизации) он возвращается так же, как ЗП оператора.
-    const totalFixedCosts = totalAmort + totalSalaryRent + (scrapFixedPartM2 * printAreaM2) + works.laborCost;
+    const backScrapFixed = back ? (back.amortM2 + back.salaryM2 + back.rentM2) * pos.customScrapRate * bA : 0;
+    const totalFixedCosts = totalAmort + totalSalaryRent + (scrapFixedPartM2 * printAreaM2) + backScrapFixed + works.laborCost;
     const totalMarkup = totalProfit + totalFixedCosts; 
     const markupPct = posGrandTotal > 0 ? (totalMarkup / posGrandTotal) * 100 : 0;
     const markupM2 = printAreaM2 > 0 ? totalMarkup / printAreaM2 : 0;
 
-    let warnings = [];
+    let warnings = [...duplexWarnings];
     if (noPrint) {
         if (!(mat.wasteMarkup > 0)) warnings.push(`⚠️ У материала «${escapeHtml(mat.name)}» наценка на перерасход 0% — без печати он уйдёт клиенту по себестоимости. Задайте наценку в админке (раздел 4, «Нац. на перерасход»).`);
     } else {
-        if (pos.printWidthM > appData.config.limits.maxWidthM || pos.matWidthM > appData.config.limits.maxWidthM) warnings.push(`⚠️ Ширина превышает возможности принтера (${appData.config.limits.maxWidthM} м)`);
+        printerInfo.warnings.forEach(w => warnings.push('⚠️ ' + escapeHtml(w)));
         if (pos.printWidthM > pos.matWidthM) warnings.push(`⚠️ Область печати шире размера заготовки!`);
         if (pos.printHeightM > pos.matHeightM) warnings.push(`⚠️ Длина печати больше длины заготовки!`);
     }
@@ -2267,7 +3049,8 @@ function calculatePositionValues(pos) {
         printSellM2, calcSetupFee, effSetupFee, printTotal, matTotal, worksLines: works.lines, worksTotal, totalWorksCost, exactGrandTotal, posGrandTotal, unitPrice,
         discountPercent, discountAmount, finalTotal, finalUnitPrice,
         totalProfit, profitPct, profitM2, totalMarkup, markupPct, markupM2,
-        warnings
+        warnings, printerInfo, printerCode, pp,
+        duplex, back, duplexCut, backTimeH: back ? back.timeH : 0, backAreaM2: bA
     };
 }
 
@@ -2409,27 +3192,335 @@ function importProject(event) {
 // ------------------------------------------------------------------
 // УПРАВЛЕНИЕ ПОЗИЦИЯМИ (UI)
 // ------------------------------------------------------------------
-function addPosition(isUserAction = true) {
+// Новая позиция — пустая: без материала, размера и тиража. Уровень цен — как у
+// предыдущей позиции заказа. Связанная позиция берёт размер, тираж, уровень цен,
+// срок и скидку у изделия (attachToLink).
+function addPosition(isUserAction = true, linkToPosId = null) {
     const defMat = appData.materials[0];
+    const prev = appData.positions[appData.positions.length - 1];
     appData.positions.push({
-        id: Date.now() + Math.floor(Math.random() * 1000),
-        materialId: defMat.id, effType: defMat.type,
-        matWidthM: 1.0, matHeightM: 1.0, printWidthM: 1.0, printHeightM: 1.0,
-        quantity: 1, modeCode: defMat.recommendedMode, usePrimer: defMat.defaultPrimer,
-        customScrapRate: defMat.scrapRate, priceTier: 'retail',
+        id: (lastAddedPositionId = Date.now() + Math.floor(Math.random() * 1000)),
+        materialId: '', effType: defMat.type,
+        matWidthM: null, matHeightM: null, printWidthM: null, printHeightM: null,
+        quantity: null, modeCode: defMat.recommendedMode, usePrimer: false,
+        customScrapRate: defMat.scrapRate, priceTier: prev ? prev.priceTier : 'retail',
         manualTimeH: null, manualSetupFee: null,
-        isMediumFormat: false, hasNoStock: false, noPrint: false, urgency: 'standard',
+        isMediumFormat: false, hasNoStock: false, noPrint: false, printer: 'auto', edgePrint: false,
+        duplex: 'none', backModeCode: '', manualBackSetupFee: null, duplexCutOpId: '', templateId: '', templateName: '', linkId: '', linkName: '', urgency: 'standard',
         discountPercent: 0, discountNote: '',
         works: []
     });
+    if (linkToPosId !== null && linkToPosId !== undefined) {
+        const newPos = appData.positions[appData.positions.length - 1];
+        attachToLink(newPos, linkToPosId, true);
+    }
     
     if (isUserAction) appData.isSavedToFile = false;
     
     renderPositions(); saveAppData();
+    if (isUserAction) scrollToPosition(appData.positions.length ? lastAddedPositionId : null);
 }
+
+// ------------------------------------------------------------------
+// СВЯЗАННЫЕ ПОЗИЦИИ (ИЗДЕЛИЯ): плёнка + ПВХ с прикаткой = табличка и т.п.
+// Связанные позиции стоят в заказе подряд, у них общий номер (3.1, 3.2…),
+// общие размер, тираж, уровень цен, срочность и скидка (меняются сразу у всех).
+// ------------------------------------------------------------------
+let lastAddedPositionId = null;
+// Позиция заполнена настолько, что её можно посчитать.
+function isPositionComplete(pos) {
+    return Boolean(pos.materialId && appData.materials.some(m => m.id === pos.materialId)
+        && pos.matWidthM > 0 && pos.matHeightM > 0 && pos.quantity > 0
+        && (pos.noPrint || (pos.printWidthM > 0 && pos.printHeightM > 0)));
+}
+// Карточка незаполненной позиции: только материал, размер, тираж и уровень цен.
+function draftCardHtml(pos, numbering) {
+    const v = x => (x === null || x === undefined || x === 0) ? '' : x;
+    const missing = [!pos.materialId && 'материал', !(pos.matWidthM > 0 && pos.matHeightM > 0) && 'размер', !(pos.quantity > 0) && 'тираж'].filter(Boolean);
+    return `<div class="pos-header">
+            <span class="pos-title">Позиция №${numbering.labels[pos.id]}: новая</span>
+            <div style="display:flex; gap:8px; flex-wrap: wrap; justify-content: flex-end;">
+                ${linkControlsHtml(pos, numbering)}
+                <button class="btn btn-danger" onclick="removePosition(${pos.id})">🗑 Удалить</button>
+            </div>
+        </div>
+        <div class="warning-box" style="background:#f8fafc; border-color: var(--border); color: var(--text);">Заполните: ${missing.join(', ') || '—'}. После этого позиция посчитается и откроются остальные настройки.</div>
+        <div class="grid">
+            <div class="form-group" style="grid-column: span 2;">
+                <label>Материал:</label>
+                <select class="form-control user-editable ${pos.materialId ? '' : 'highlight-input'}" onchange="onMaterialChange(${pos.id}, this.value)">
+                    <option value="" ${pos.materialId ? '' : 'selected'} disabled>— выберите материал —</option>
+                    ${materialOptionsHtml(pos.materialId)}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Ширина заготовки (м):</label>
+                <input type="number" min="0.001" step="0.001" class="form-control user-editable" value="${v(pos.matWidthM)}" placeholder="напр. 0.6" onchange="updatePosField(${pos.id}, 'matWidthM', this.value === '' ? null : Number(this.value))">
+            </div>
+            <div class="form-group">
+                <label>Длина заготовки (м):</label>
+                <input type="number" min="0.001" step="0.001" class="form-control user-editable" value="${v(pos.matHeightM)}" placeholder="напр. 0.4" onchange="updatePosField(${pos.id}, 'matHeightM', this.value === '' ? null : Number(this.value))">
+            </div>
+            <div class="form-group">
+                <label>Тираж (шт):</label>
+                <input type="number" min="1" class="form-control user-editable" value="${v(pos.quantity)}" placeholder="шт" onchange="updatePosField(${pos.id}, 'quantity', this.value === '' ? null : Math.max(1, Math.floor(Number(this.value))))">
+            </div>
+            <div class="form-group">
+                <label>Уровень цен:</label>
+                <select class="form-control user-editable" onchange="updatePosField(${pos.id}, 'priceTier', this.value)">
+                    <option value="retail" ${pos.priceTier === 'retail' ? 'selected' : ''}>Розница (x${appData.config.markupRetail})</option>
+                    <option value="wholesale" ${pos.priceTier === 'wholesale' ? 'selected' : ''}>Опт (x${appData.config.markupWholesale})</option>
+                    <option value="dealer" ${pos.priceTier === 'dealer' ? 'selected' : ''}>Дилер (x${appData.config.markupDealer})</option>
+                </select>
+            </div>
+        </div>`;
+}
+function newLinkId() {
+    return 'lnk_' + Date.now().toString(36) + Math.floor(Math.random() * 1000);
+}
+function linkMembers(linkId) {
+    return appData.positions.filter(p => linkId && p.linkId === linkId);
+}
+// Держим участников изделия подряд (на месте первого) и распускаем «изделия» из одной позиции.
+function normalizeLinkOrder() {
+    const counts = {};
+    appData.positions.forEach(p => { if (p.linkId) counts[p.linkId] = (counts[p.linkId] || 0) + 1; });
+    appData.positions.forEach(p => { if (p.linkId && counts[p.linkId] < 2) { p.linkId = ''; p.linkName = ''; } });
+    const out = [], seen = new Set();
+    appData.positions.forEach(p => {
+        if (!p.linkId) { out.push(p); return; }
+        if (seen.has(p.linkId)) return;
+        seen.add(p.linkId);
+        out.push(...appData.positions.filter(q => q.linkId === p.linkId));
+    });
+    appData.positions = out;
+}
+// Сквозная нумерация заказа: отдельная позиция или изделие — следующий номер,
+// позиции внутри изделия — 3.1, 3.2… Без пропусков после удаления.
+function computeNumbering() {
+    const labels = {}, items = [];
+    const list = appData.positions;
+    let n = 0, i = 0;
+    while (i < list.length) {
+        const p = list[i];
+        n++;
+        if (!p.linkId) {
+            labels[p.id] = String(n);
+            items.push({ type: 'single', number: n, positions: [p] });
+            i++;
+            continue;
+        }
+        const members = [];
+        let k = 0;
+        while (i < list.length && list[i].linkId === p.linkId) {
+            k++;
+            labels[list[i].id] = `${n}.${k}`;
+            members.push(list[i]);
+            i++;
+        }
+        items.push({ type: 'link', number: n, linkId: p.linkId, name: p.linkName || 'Изделие', positions: members });
+    }
+    return { labels, items };
+}
+function itemLabel(item) {
+    if (item.type === 'link') return `№${item.number}: 🔗 ${item.name} (${item.positions.length} поз.)`;
+    const p = item.positions[0];
+    const mat = appData.materials.find(m => m.id === p.materialId);
+    return `№${item.number}: ${p.templateName ? p.templateName + ' · ' : ''}${mat ? mat.name : 'позиция'}`;
+}
+// Ставит позицию pos в изделие позиции targetPosId (создаёт изделие, если его ещё нет)
+// и переносит её в конец этого изделия. copyShared — взять у изделия размер, тираж, уровень цен…
+function attachToLink(pos, targetPosId, copyShared) {
+    const target = appData.positions.find(p => p.id === targetPosId);
+    if (!target || target === pos) return;
+    if (!target.linkId) { target.linkId = newLinkId(); target.linkName = target.linkName || ''; }
+    pos.linkId = target.linkId;
+    pos.linkName = target.linkName;
+    if (copyShared) {
+        Object.assign(pos, {
+            matWidthM: target.matWidthM, matHeightM: target.matHeightM,
+            printWidthM: target.matWidthM, printHeightM: target.matHeightM,
+            quantity: target.quantity, priceTier: target.priceTier,
+            urgency: target.urgency, discountPercent: target.discountPercent
+        });
+    }
+    appData.positions = appData.positions.filter(p => p !== pos);
+    const members = linkMembers(target.linkId);
+    const lastIdx = appData.positions.indexOf(members[members.length - 1]);
+    appData.positions.splice(lastIdx + 1, 0, pos);
+    lastAddedPositionId = pos.id;
+}
+function linkPositionTo(posId, targetPosId) {
+    const pos = appData.positions.find(p => p.id === posId);
+    if (!pos || !targetPosId) return;
+    attachToLink(pos, Number(targetPosId), false);
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+function unlinkPosition(posId) {
+    const pos = appData.positions.find(p => p.id === posId);
+    if (!pos || !pos.linkId) return;
+    const members = linkMembers(pos.linkId);
+    const last = members[members.length - 1];
+    pos.linkId = ''; pos.linkName = '';
+    appData.positions = appData.positions.filter(p => p !== pos);
+    appData.positions.splice(appData.positions.indexOf(last) + (last === pos ? 0 : 1), 0, pos);
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+function dissolveLink(linkId) {
+    if (!confirm('Разъединить изделие? Позиции останутся в заказе отдельными, со своими настройками.')) return;
+    linkMembers(linkId).forEach(p => { p.linkId = ''; p.linkName = ''; });
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+function removeLink(linkId) {
+    const members = linkMembers(linkId);
+    if (!confirm(`Удалить изделие «${members[0] && members[0].linkName || 'Изделие'}» целиком (${members.length} поз.)?`)) return;
+    appData.positions = appData.positions.filter(p => p.linkId !== linkId);
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+function renameLink(linkId, name) {
+    linkMembers(linkId).forEach(p => { p.linkName = String(name || '').trim(); });
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+// Общие параметры изделия — меняются сразу у всех его позиций.
+function setLinkField(linkId, field, value) {
+    const members = linkMembers(linkId);
+    members.forEach(p => {
+        if (field === 'width') { p.matWidthM = value; p.printWidthM = value; }
+        else if (field === 'height') { p.matHeightM = value; p.printHeightM = value; }
+        else if (field === 'quantity') {
+            // Введённое вручную время печати масштабируем пропорционально тиражу.
+            if (p.manualTimeH !== null && p.quantity > 0 && value > 0) p.manualTimeH = Number((p.manualTimeH * value / p.quantity).toFixed(3));
+            p.quantity = value;
+        }
+        else p[field] = value;
+    });
+    appData.isSavedToFile = false;
+    renderPositions(); saveAppData();
+}
+function linkHeaderHtml(item, calcs) {
+    const first = item.positions[0];
+    const same = f => item.positions.every(p => p[f] === first[f]);
+    const sizeSame = same('matWidthM') && same('matHeightM');
+    const total = item.positions.reduce((s, p) => s + (calcs[p.id] ? calcs[p.id].finalTotal : 0), 0);
+    const before = item.positions.reduce((s, p) => s + (calcs[p.id] ? calcs[p.id].posGrandTotal : 0), 0);
+    const qtySame = same('quantity');
+    const cur = appData.config.baseCurrency;
+    const lid = jsArg(item.linkId);
+    return `<div class="link-head">
+        <div>
+            <div class="link-title">🔗 Изделие №${item.number}</div>
+            <input type="text" class="form-control user-editable" style="min-width: 230px; font-weight:600;" value="${escapeHtml(first.linkName)}" placeholder="Название: табличка, стенд…" onchange="renameLink(${lid}, this.value)">
+        </div>
+        <div class="form-group"><label>Ширина изделия (м):</label>
+            <input type="number" min="0.001" step="0.001" class="form-control user-editable" style="width:110px;" value="${first.matWidthM ?? ''}" onchange="setLinkField(${lid}, 'width', Number(this.value))" title="Ставит размер заготовки и печати всем позициям изделия"></div>
+        <div class="form-group"><label>Длина изделия (м):</label>
+            <input type="number" min="0.001" step="0.001" class="form-control user-editable" style="width:110px;" value="${first.matHeightM ?? ''}" onchange="setLinkField(${lid}, 'height', Number(this.value))"></div>
+        <div class="form-group"><label>Тираж (шт):</label>
+            <input type="number" min="1" class="form-control user-editable" style="width:90px;" value="${first.quantity ?? ''}" onchange="setLinkField(${lid}, 'quantity', Math.max(1, Math.floor(Number(this.value))))"></div>
+        <div class="form-group"><label>Уровень цен:</label>
+            <select class="form-control user-editable" onchange="setLinkField(${lid}, 'priceTier', this.value)">
+                <option value="retail" ${first.priceTier === 'retail' ? 'selected' : ''}>Розница</option>
+                <option value="wholesale" ${first.priceTier === 'wholesale' ? 'selected' : ''}>Опт</option>
+                <option value="dealer" ${first.priceTier === 'dealer' ? 'selected' : ''}>Дилер</option>
+            </select></div>
+        <div class="form-group"><label>Срок:</label>
+            <select class="form-control user-editable" onchange="setLinkField(${lid}, 'urgency', this.value)">
+                <option value="standard" ${first.urgency === 'standard' ? 'selected' : ''}>Стандарт</option>
+                <option value="24h" ${first.urgency === '24h' ? 'selected' : ''}>24ч (+30%)</option>
+                <option value="same_day" ${first.urgency === 'same_day' ? 'selected' : ''}>День-в-день (+50%)</option>
+            </select></div>
+        <div class="form-group"><label>Скидка (%):</label>
+            <input type="number" min="0" max="100" class="form-control user-editable" style="width:80px;" value="${first.discountPercent}" onchange="setLinkField(${lid}, 'discountPercent', Math.min(100, Math.max(0, Number(this.value))))"></div>
+        <div class="link-total">${before > total ? `<span style="text-decoration:line-through; color:var(--text-muted); font-size:14px; font-weight:400;">${before.toFixed(2)}</span> ` : ''}${total.toFixed(2)} ${cur}
+            <small>${qtySame && first.quantity > 0 ? `за 1 изделие: ${(total / first.quantity).toFixed(2)} ${cur}` : 'тираж у позиций разный'}</small></div>
+    </div>
+    ${!sizeSame || !qtySame || !same('priceTier') || !same('urgency') || !same('discountPercent') ? `<div class="warning-box" style="margin-bottom:10px;">⚠️ У позиций изделия разные ${[!sizeSame && 'размеры', !qtySame && 'тиражи', !same('priceTier') && 'уровни цен', !same('urgency') && 'сроки', !same('discountPercent') && 'скидки'].filter(Boolean).join(', ')}. Значение, введённое выше, ставится всем позициям.</div>` : ''}
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+        <button class="btn btn-outline btn-sm" onclick="addPosition(true, ${first.id})">➕ Добавить позицию в изделие</button>
+        <button class="btn btn-outline btn-sm" onclick="openTemplatePicker(${first.id})">📋 Типовая в изделие</button>
+        <button class="btn btn-outline btn-sm" onclick="saveLinkAsTemplate(${lid})">⭐ Изделие в типовые</button>
+        <button class="btn btn-outline btn-sm" onclick="dissolveLink(${lid})">✂️ Разъединить</button>
+        <button class="btn btn-danger btn-sm" onclick="removeLink(${lid})">🗑 Удалить изделие</button>
+    </div>`;
+}
+function linkControlsHtml(pos, numbering) {
+    if (pos.linkId) {
+        return `<button class="btn btn-outline" onclick="unlinkPosition(${pos.id})" title="Сделать отдельной позицией заказа">✂️ Отвязать</button>`;
+    }
+    const others = numbering.items.filter(it => !it.positions.includes(pos));
+    return `<button class="btn btn-outline" onclick="addPosition(true, ${pos.id})" title="Добавить позицию, связанную с этой (вместе — одно изделие: табличка, стенд…)">🔗 + связанная</button>
+        ${others.length ? `<select class="form-control" style="width:auto; max-width:200px; padding:6px;" onchange="linkPositionTo(${pos.id}, this.value)" title="Объединить эту позицию с другой в одно изделие">
+            <option value="">🔗 Связать с…</option>
+            ${others.map(it => `<option value="${it.positions[0].id}">${escapeHtml(itemLabel(it))}</option>`).join('')}
+        </select>` : ''}`;
+}
+// Выбор при добавлении: отдельная позиция или связанная с существующей.
+let pendingTemplateAdd = null;
+// «➕ Добавить позицию»: сначала выбор — индивидуальная или типовая, и куда
+// (отдельно или в изделие с существующей позицией).
+let addStartTarget = null;
+function openAddPositionChoice() {
+    pendingTemplateAdd = null;
+    addStartTarget = null;
+    renderAddStart();
+    document.getElementById('addChoiceModal').style.display = 'flex';
+}
+function renderAddStart() {
+    const { items } = computeNumbering();
+    document.getElementById('addChoiceTitle').textContent = 'Добавить позицию';
+    document.getElementById('addChoiceList').innerHTML = `
+        ${items.length ? `<div class="form-group" style="margin-bottom:14px;">
+            <label>Куда:</label>
+            <select class="form-control" onchange="addStartTarget = this.value ? Number(this.value) : null">
+                <option value="">Отдельной позицией заказа</option>
+                ${items.map(it => `<option value="${it.positions[0].id}" ${addStartTarget === it.positions[0].id ? 'selected' : ''}>🔗 Связать с ${escapeHtml(itemLabel(it))}</option>`).join('')}
+            </select>
+        </div>` : ''}
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <button class="btn btn-primary" style="padding:16px; display:flex; flex-direction:column; align-items:flex-start; gap:4px; text-align:left;" onclick="chooseAddKind('custom')">
+                <span style="font-size:16px;">✏️ Индивидуальная</span>
+                <span style="font-size:12px; font-weight:400; opacity:.85;">пустая позиция — выбрать материал, размер, тираж</span>
+            </button>
+            <button class="btn btn-outline" style="padding:16px; display:flex; flex-direction:column; align-items:flex-start; gap:4px; text-align:left; border-color: var(--primary); color: var(--primary);" onclick="chooseAddKind('template')">
+                <span style="font-size:16px;">📋 Типовая</span>
+                <span style="font-size:12px; font-weight:400;">готовая из списка, с поиском (${(appData.positionTemplates || []).length} шт.)</span>
+            </button>
+        </div>`;
+}
+function chooseAddKind(kind) {
+    document.getElementById('addChoiceModal').style.display = 'none';
+    if (kind === 'template') openTemplatePicker(addStartTarget, true);
+    else addPosition(true, addStartTarget);
+}
+function renderAddChoice(title) {
+    const { items } = computeNumbering();
+    document.getElementById('addChoiceTitle').textContent = title;
+    document.getElementById('addChoiceList').innerHTML = `
+        <button class="btn btn-primary" style="width:100%; justify-content:flex-start; margin-bottom:10px;" onclick="chooseAddTarget(null)">➕ Отдельная позиция</button>
+        <div style="font-size:12px; color:var(--text-muted); margin:6px 0;">или связанная (вместе — одно изделие):</div>
+        ${items.map(it => `<button class="btn btn-outline" style="width:100%; justify-content:flex-start; margin-bottom:6px; text-align:left;" onclick="chooseAddTarget(${it.positions[0].id})">🔗 Связать с ${escapeHtml(itemLabel(it))}</button>`).join('')}`;
+    document.getElementById('addChoiceModal').style.display = 'flex';
+}
+function chooseAddTarget(targetId) {
+    document.getElementById('addChoiceModal').style.display = 'none';
+    if (pendingTemplateAdd) { const t = pendingTemplateAdd; pendingTemplateAdd = null; addPositionFromTemplate(t, targetId, true); return; }
+    addPosition(true, targetId);
+}
+function scrollToPosition(posId) {
+    if (!posId) return;
+    const el = document.querySelector(`[data-pos-id="${posId}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 
 function removePosition(id) {
     appData.positions = appData.positions.filter(p => p.id !== id);
+    normalizeLinkOrder();
     appData.isSavedToFile = false;
     renderPositions(); saveAppData();
 }
@@ -2456,8 +3547,8 @@ function updatePosField(posId, field, value) {
         if (field === 'matWidthM') pos.printWidthM = value;
         if (field === 'matHeightM') pos.printHeightM = value;
 
-        if (field === 'printWidthM' && value > pos.matWidthM) pos.printWidthM = pos.matWidthM;
-        if (field === 'printHeightM' && value > pos.matHeightM) pos.printHeightM = pos.matHeightM;
+        if (field === 'printWidthM' && pos.matWidthM > 0 && value > pos.matWidthM) pos.printWidthM = pos.matWidthM;
+        if (field === 'printHeightM' && pos.matHeightM > 0 && value > pos.matHeightM) pos.printHeightM = pos.matHeightM;
 
         appData.isSavedToFile = false;
         renderPositions(); saveAppData();
@@ -2502,16 +3593,41 @@ function renderPositions() {
 
     let totalAreaAll = 0, totalTimeAll = 0, totalPrintSellAll = 0, totalMatSellAll = 0, grandTotalAll = 0, totalDiscountAmountAll = 0, finalGrandTotalAll = 0, totalWorksAll = 0;
 
-    appData.positions.forEach((pos, index) => {
-        const calc = calculatePositionValues(pos);
+    normalizeLinkOrder();
+    const numbering = computeNumbering();
+    const calcs = {};
+    appData.positions.forEach(pos => { calcs[pos.id] = isPositionComplete(pos) ? calculatePositionValues(pos) : null; });
+    let groupEl = null, groupLinkId = null;
 
-        if (!pos.matWidthM || (!pos.noPrint && !pos.printWidthM) || pos.quantity <= 0) {
-            container.innerHTML += `<div class="position-card error-box"><button class="btn btn-danger btn-sm" onclick="removePosition(${pos.id})" style="float:right;">🗑</button>⚠️ Укажите размеры в метрах и тираж > 0</div>`;
+    appData.positions.forEach((pos, index) => {
+        const calc = calcs[pos.id];
+        // Изделие: рамка с общими параметрами, внутри — его позиции.
+        let target = container;
+        if (pos.linkId) {
+            if (pos.linkId !== groupLinkId) {
+                groupLinkId = pos.linkId;
+                groupEl = document.createElement('div');
+                groupEl.className = 'link-group';
+                groupEl.dataset.linkId = pos.linkId;
+                const item = numbering.items.find(it => it.linkId === pos.linkId);
+                groupEl.innerHTML = linkHeaderHtml(item, calcs);
+                container.appendChild(groupEl);
+            }
+            target = groupEl;
+        } else { groupLinkId = null; groupEl = null; }
+
+        if (!calc) {
+            const draft = document.createElement('div');
+            draft.className = 'position-card';
+            draft.style.borderStyle = 'dashed';
+            draft.dataset.posId = pos.id;
+            draft.innerHTML = draftCardHtml(pos, numbering);
+            target.appendChild(draft);
             return;
         }
 
-        totalAreaAll += calc.printAreaM2;
-        totalTimeAll += calc.effTimeH;
+        totalAreaAll += calc.printAreaM2 + calc.backAreaM2;
+        totalTimeAll += calc.effTimeH + calc.backTimeH;
         totalPrintSellAll += calc.printTotal;
         totalMatSellAll += calc.matTotal;
         totalWorksAll += calc.worksTotal;
@@ -2521,11 +3637,16 @@ function renderPositions() {
 
         const card = document.createElement('div');
         card.className = 'position-card';
+        card.dataset.posId = pos.id;
 
         card.innerHTML = `
             <div class="pos-header">
-                <span class="pos-title">Позиция №${index + 1}: ${escapeHtml(calc.mat.name)}</span>
-                <button class="btn btn-danger" onclick="removePosition(${pos.id})">🗑 Удалить</button>
+                <span class="pos-title">Позиция №${numbering.labels[pos.id]}: ${pos.templateName ? `📋 ${escapeHtml(pos.templateName)} · ` : ''}${escapeHtml(calc.mat.name)}</span>
+                <div style="display:flex; gap:8px; flex-wrap: wrap; justify-content: flex-end;">
+                    ${linkControlsHtml(pos, numbering)}
+                    <button class="btn btn-outline" onclick="savePositionAsTemplate(${pos.id})" title="Сохранить настройки этой позиции как типовую (шаблон), чтобы потом добавлять её через «➕ Добавить позицию» → «📋 Типовая»">⭐ В типовые</button>
+                    <button class="btn btn-danger" onclick="removePosition(${pos.id})">🗑 Удалить</button>
+                </div>
             </div>
 
             ${calc.warnings.length > 0 ? `<div class="warning-box">${calc.warnings.join('<br>')}</div>` : ''}
@@ -2550,8 +3671,9 @@ function renderPositions() {
                         <option value="sheet" ${pos.effType === 'sheet' ? 'selected' : ''}>Листовой материал</option>
                     </select>
                 </div>
+                ${pos.noPrint ? '' : printerFieldHtml(pos, calc.printerInfo)}
                 ${pos.noPrint ? '' : `<div class="form-group">
-                    <label>Режим печати Mimaki:</label>
+                    <label>Режим печати:</label>
                     <select class="form-control user-editable" onchange="updatePosField(${pos.id}, 'modeCode', this.value)">
                         ${Object.keys(appData.printModes).map(k => `<option value="${k}" ${k === pos.modeCode ? 'selected' : ''}>${escapeHtml(appData.printModes[k].name)} (${appData.printModes[k].speedM2h} м²/ч)</option>`).join('')}
                     </select>
@@ -2592,6 +3714,8 @@ function renderPositions() {
                         </div>
                     </div>
                 </div>`}
+
+                ${pos.noPrint ? '' : duplexBlockHtml(pos, calc)}
                 
                 ${pos.noPrint ? '' : `<div class="form-group">
                     <label>Время печати (ч): ${pos.manualTimeH !== null ? `<button type="button" class="btn btn-outline btn-sm" style="padding:1px 6px; font-size:11px;" onclick="resetManualOverride(${pos.id}, 'manualTimeH')" title="Вернуться к автоматическому расчёту">↺ Авто</button>` : ''}</label>
@@ -2649,7 +3773,7 @@ function renderPositions() {
 
             <div class="pos-financials">
                 <div>
-                    <strong>Мат-л заготовки:</strong> ${calc.matAreaM2.toFixed(2)} м² | <strong>Площадь печати:</strong> ${calc.printAreaM2.toFixed(2)} м² <br>
+                    <strong>Мат-л заготовки:</strong> ${calc.matAreaM2.toFixed(2)} м² | <strong>Площадь печати:</strong> ${calc.printAreaM2.toFixed(2)} м²${calc.back ? ` + 2-я сторона ${calc.back.area.toFixed(2)} м²` : ''} <br>
                     ${calc.worksTotal > 0 ? `<strong>Печать + материал:</strong> ${(calc.printTotal + calc.matTotal).toFixed(2)} · <strong>Доп. работы:</strong> ${calc.worksTotal.toFixed(2)} ${appData.config.baseCurrency}<br>` : ''}
                     <strong>Цена за 1 шт:</strong> ${calc.finalUnitPrice.toFixed(2)} ${appData.config.baseCurrency}
                 </div>
@@ -2667,9 +3791,11 @@ function renderPositions() {
                 • Праймер (химия и работа): ${calc.primerM2.toFixed(2)} /м²<br>
                 • <strong>Полная себестоимость печати:</strong> ${calc.fullCostPriceM2.toFixed(2)} /м²<br>
                 • <strong>Коммерческий тариф печати клиенту:</strong> ${calc.printSellM2.toFixed(2)} /м²<br>
+                • Принтер для расчёта: ${PRINTERS[calc.printerCode].name}${printerCostDiffers(calc.printerCode) ? ' (своя себестоимость)' : ''}<br>
+                ${calc.back ? `• <strong>2-я сторона (${escapeHtml(calc.back.mode.name)}):</strong> себестоимость ${calc.back.fullCostPriceM2.toFixed(2)} /м², клиенту ${calc.back.printSellM2.toFixed(2)} /м² × ${calc.back.area.toFixed(2)} м² + приладка ${calc.back.setupFee.toFixed(2)} = ${calc.back.total.toFixed(2)} ${appData.config.baseCurrency}, время ${calc.back.timeH.toFixed(2)} ч<br>` : ''}
                 • <strong>Продажа материала под печатью:</strong> ${calc.matSellM2.toFixed(2)} /м² × ${calc.matChargedAreaM2.toFixed(2)} м²<br>
                 ${calc.wasteAreaM2 > 0 ? `• <strong>Материал вне области печати (перерасход):</strong> ${calc.wasteSellM2.toFixed(2)} /м² × ${calc.wasteAreaM2.toFixed(2)} м² = ${calc.wasteCostTotal.toFixed(2)} ${appData.config.baseCurrency}<br>` : ''}
-                ${calc.worksLines.map(l => `• <strong>Доп. работа «${escapeHtml(l.op.name)}»:</strong> ${formatQty(l.qty)} ${l.unitShort}${l.coef !== 1 ? ` × сложность ${l.coef}` : ''}${l.cons ? ` · расходник «${escapeHtml(formatConsumableName(l.cons))}» ${formatQty(l.consQty)} ${getConsumableUnitLabel(l.cons.unit)}` : ''}${l.minApplied ? ' · применён минимум' : ''}${l.tierDiscPct > 0 ? ` · скидка уровня ${l.tierDiscPct}%` : ''}${l.urgencyMult > 1 ? ` · срочность ×${l.urgencyMult}` : ''} = ${l.total.toFixed(2)} ${appData.config.baseCurrency} (себест. ${l.cost.toFixed(2)})<br>`).join('')}
+                ${calc.worksLines.map(l => `• <strong>${l.duplexAuto ? 'Двусторонняя, порезка по меткам' : 'Доп. работа'} «${escapeHtml(l.op.name)}»:</strong> ${formatQty(l.qty)} ${l.unitShort}${l.coef !== 1 ? ` × сложность ${l.coef}` : ''}${l.cons ? ` · расходник «${escapeHtml(formatConsumableName(l.cons))}» ${formatQty(l.consQty)} ${getConsumableUnitLabel(l.cons.unit)}` : ''}${l.minApplied ? ' · применён минимум' : ''}${l.tierDiscPct > 0 ? ` · скидка уровня ${l.tierDiscPct}%` : ''}${l.urgencyMult > 1 ? ` · срочность ×${l.urgencyMult}` : ''} = ${l.total.toFixed(2)} ${appData.config.baseCurrency} (себест. ${l.cost.toFixed(2)})<br>`).join('')}
                 
                 <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border);">
                     • <strong>ВАЛОВАЯ НАЦЕНКА (без учета ЗП, Аренды и Амортизации):</strong><br>
@@ -2686,10 +3812,12 @@ function renderPositions() {
                 </div>
             </div>
         `;
-        container.appendChild(card);
+        target.appendChild(card);
     });
 
-    document.getElementById('totalPositionsCount').innerText = appData.positions.length;
+    document.getElementById('totalPositionsCount').innerText = numbering.items.length === appData.positions.length
+        ? appData.positions.length
+        : `${numbering.items.length} (строк: ${appData.positions.length})`;
     document.getElementById('totalOrderArea').innerText = totalAreaAll.toFixed(2) + ' м²';
     document.getElementById('totalOrderTime').innerText = totalTimeAll.toFixed(2) + ' ч';
     document.getElementById('totalPrintMatSplit').innerText = `${totalPrintSellAll.toFixed(0)} / ${totalMatSellAll.toFixed(0)} ${appData.config.baseCurrency}`;
@@ -2947,11 +4075,19 @@ function reallyOpenAdminModal() {
     document.getElementById('cfgMarkupRetail').value = c.markupRetail;
     document.getElementById('cfgMarkupWholesale').value = c.markupWholesale;
     document.getElementById('cfgMarkupDealer').value = c.markupDealer;
+    c.limits = printerLimits();
+    document.getElementById('cfgMimakiMaxWidth').value = c.limits.maxWidthM;
+    document.getElementById('cfgMimakiMaxSheetLen').value = c.limits.mimakiMaxSheetLengthM;
+    document.getElementById('cfgMimakiMargin').value = c.limits.mimakiSheetMarginMm;
+    document.getElementById('cfgArizonaW').value = c.limits.arizonaMaxWidthM;
+    document.getElementById('cfgArizonaL').value = c.limits.arizonaMaxLengthM;
+    fillPrinterCostAndDuplexInputs();
     document.getElementById('cfgSetupFeeRollBase').value = appData.setupFeeBase.rollUah;
     document.getElementById('cfgSetupFeeSheetBase').value = appData.setupFeeBase.sheetUah;
     document.getElementById('setupFeeRollFactory').textContent = defaultAppData.setupFeeBase.rollUah + ' грн';
     document.getElementById('setupFeeSheetFactory').textContent = defaultAppData.setupFeeBase.sheetUah + ' грн';
     renderEngineeringSection();
+    renderTemplatesTable();
     renderMaterialGroupsList();
     renderMaterialsTable();
     fillWorksConfigInputs();
@@ -3289,6 +4425,13 @@ function updateAdminConfig() {
     c.markupRetail = validNumber(document.getElementById('cfgMarkupRetail').value, c.markupRetail, 0);
     c.markupWholesale = validNumber(document.getElementById('cfgMarkupWholesale').value, c.markupWholesale, 0);
     c.markupDealer = validNumber(document.getElementById('cfgMarkupDealer').value, c.markupDealer, 0);
+    c.limits = printerLimits();
+    c.limits.maxWidthM = validNumber(document.getElementById('cfgMimakiMaxWidth').value, c.limits.maxWidthM, 0.01);
+    c.limits.mimakiMaxSheetLengthM = validNumber(document.getElementById('cfgMimakiMaxSheetLen').value, c.limits.mimakiMaxSheetLengthM, 0.01);
+    c.limits.mimakiSheetMarginMm = validNumber(document.getElementById('cfgMimakiMargin').value, c.limits.mimakiSheetMarginMm, 0);
+    c.limits.arizonaMaxWidthM = validNumber(document.getElementById('cfgArizonaW').value, c.limits.arizonaMaxWidthM, 0.01);
+    c.limits.arizonaMaxLengthM = validNumber(document.getElementById('cfgArizonaL').value, c.limits.arizonaMaxLengthM, 0.01);
+    readPrinterCostAndDuplexInputs();
 
     document.getElementById('currentBaseCurrency').innerText = c.baseCurrency;
     document.getElementById('dispUsdRate').innerText = c.exchangeRates.USD.toFixed(2);
@@ -3306,7 +4449,8 @@ function renderMaterialsTable() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             ${moveCellHtml('materials', idx, nav)}
-            <td><input type="text" value="${escapeHtml(mat.name)}" onchange="appData.materials[${idx}].name=this.value; appData.isSavedToFile=false; saveAppData()"></td>
+            <td><input type="text" value="${escapeHtml(mat.name)}" onchange="appData.materials[${idx}].name=this.value; appData.isSavedToFile=false; markPriceChanged(); saveAppData()"></td>
+            <td><input type="text" value="${escapeHtml(mat.clientName || '')}" placeholder="як у назві" onchange="appData.materials[${idx}].clientName=this.value.trim(); appData.isSavedToFile=false; markPriceChanged(); saveAppData()"></td>
             <td>
                 <select onchange="changeMaterialGroup(${idx}, this.value)">
                     ${MATERIAL_GROUPS.map(g => `<option value="${g.code}" ${mat.group === g.code ? 'selected' : ''}>${escapeHtml(g.label)}</option>`).join('')}
@@ -3332,6 +4476,13 @@ function renderMaterialsTable() {
             <td><input type="number" step="1" placeholder="база" value="${mat.setupFeeRollOverride === null || mat.setupFeeRollOverride === undefined ? '' : mat.setupFeeRollOverride}" title="Пусто = используется базовое значение из инженерного раздела" onchange="appData.materials[${idx}].setupFeeRollOverride = this.value === '' ? null : Number(this.value); appData.isSavedToFile=false; saveAppData()"></td>
             <td><input type="number" step="1" placeholder="база" value="${mat.setupFeeSheetOverride === null || mat.setupFeeSheetOverride === undefined ? '' : mat.setupFeeSheetOverride}" title="Пусто = используется базовое значение из инженерного раздела" onchange="appData.materials[${idx}].setupFeeSheetOverride = this.value === '' ? null : Number(this.value); appData.isSavedToFile=false; saveAppData()"></td>
             <td style="text-align:center;"><input type="checkbox" ${mat.defaultPrimer ? 'checked' : ''} onchange="appData.materials[${idx}].defaultPrimer=this.checked; appData.isSavedToFile=false; saveAppData()"></td>
+            <td>
+                <select onchange="appData.materials[${idx}].cutKnife=this.value; appData.isSavedToFile=false; markPriceChanged(); saveAppData(); renderPositions()" title="${escapeHtml(CUT_KNIVES.drag.label)} — ${escapeHtml(CUT_KNIVES.drag.hint)}; ${escapeHtml(CUT_KNIVES.vibro.label)} — ${escapeHtml(CUT_KNIVES.vibro.hint)}">
+                    <option value="" ${!mat.cutKnife ? 'selected' : ''}>Авто: ${CUT_KNIVES[guessCutKnife(mat)].label.toLowerCase()}</option>
+                    <option value="drag" ${mat.cutKnife === 'drag' ? 'selected' : ''}>Флюгерный нож</option>
+                    <option value="vibro" ${mat.cutKnife === 'vibro' ? 'selected' : ''}>Вибронож</option>
+                </select>
+            </td>
             <td><button class="btn btn-danger btn-sm" onclick="removeMaterialRow(${idx})">🗑</button></td>
         `;
         tbody.appendChild(tr);
@@ -3463,6 +4614,7 @@ function renderConsumablesTable() {
             ${moveCellHtml('consumables', idx, nav)}
             <td><input type="text" list="consumableKindsList" value="${escapeHtml(c.kind)}" onchange="setConsumableField(${idx}, 'kind', this.value.trim())"></td>
             <td><input type="text" value="${escapeHtml(c.name)}" onchange="setConsumableField(${idx}, 'name', this.value.trim() || 'Расходник без названия')"></td>
+            <td><input type="text" value="${escapeHtml(c.clientName || '')}" placeholder="як у назві" onchange="setConsumableField(${idx}, 'clientName', this.value.trim())"></td>
             <td><input type="number" step="0.1" min="0" value="${numOrEmpty(c.widthMm)}" onchange="setConsumableField(${idx}, 'widthMm', this.value === '' ? null : Math.max(0, Number(this.value)))"></td>
             <td><input type="number" step="0.1" min="0" value="${numOrEmpty(c.thicknessMm)}" onchange="setConsumableField(${idx}, 'thicknessMm', this.value === '' ? null : Math.max(0, Number(this.value)))"></td>
             <td><input type="text" value="${escapeHtml(c.spec)}" placeholder="напр. акриловый клей" onchange="setConsumableField(${idx}, 'spec', this.value)"></td>
@@ -3526,6 +4678,7 @@ function renderOperationsTable() {
         <tr style="${op.hidden ? 'opacity:0.55;' : ''}">
             ${moveCellHtml('operations', idx, nav)}
             <td><input type="text" value="${escapeHtml(op.name)}" onchange="setOperationField(${idx}, 'name', this.value.trim() || 'Работа без названия')"></td>
+            <td><input type="text" value="${escapeHtml(op.clientName || '')}" placeholder="як у назві" onchange="setOperationField(${idx}, 'clientName', this.value.trim())"></td>
             <td>${isOrder
                 ? '<span style="font-size:11px; color: var(--text-muted);">— услуга на весь заказ —</span>'
                 : `<div class="groups-cell">${WORK_GROUP_CODES.map(code => `<label><input type="checkbox" ${op.groups.includes(code) ? 'checked' : ''} onchange="toggleOperationGroup(${idx}, '${code}', this.checked)">${escapeHtml(getGroupLabel(code))}</label>`).join('')}</div>`}</td>
@@ -3587,6 +4740,7 @@ function renderEngineeringSection() {
             <td>${isCustom
                 ? `<input type="text" value="${escapeHtml(mode.name)}" onchange="updatePrintMode('${code}','name',this.value)">`
                 : escapeHtml(mode.name)}</td>
+            <td><input type="text" value="${escapeHtml(mode.clientName || '')}" placeholder="як у назві" title="Как режим называется в PDF для клиента (укр.)" onchange="updatePrintMode('${code}','clientName',this.value.trim())"></td>
             <td><input type="text" value="${escapeHtml(mode.description || '')}" placeholder="Заметка (необязательно)" onchange="updatePrintMode('${code}','description',this.value)"></td>
             <td><input type="number" step="0.1" min="0.1" value="${mode.speedM2h}" onchange="updatePrintMode('${code}','speedM2h', Math.max(0.1, Number(this.value)))"></td>
             <td><input type="number" step="0.1" min="0" value="${mode.inkMlM2}" onchange="updatePrintMode('${code}','inkMlM2', Math.max(0, Number(this.value)))"></td>
@@ -3664,13 +4818,15 @@ function exportMaterialsExcel() {
     if (typeof XLSX === 'undefined') { alert('Библиотека Excel недоступна. Проверьте интернет.'); return; }
 
     const materialsRows = [
-        ['ID (не менять)', 'Название', 'Тип', 'Цена за м²', 'Валюта', 'Брак, %', 'Наценка, %', 'Наценка на перерасход, %', 'Приладка рулон, переопр.', 'Приладка лист, переопр.', 'Праймер', 'Режим печати', 'Группа', 'Поставщик'],
+        ['ID (не менять)', 'Название', 'Тип', 'Цена за м²', 'Валюта', 'Брак, %', 'Наценка, %', 'Наценка на перерасход, %', 'Приладка рулон, переопр.', 'Приладка лист, переопр.', 'Праймер', 'Режим печати', 'Группа', 'Поставщик', 'Нож для порезки насквозь (флюгер/вибро/пусто=авто)', 'Название для клиента (укр.)'],
         ...appData.materials.map(m => [
             m.id, m.name, m.type, m.price, m.currency,
             m.scrapRate * 100, m.baseMarkup, m.wasteMarkup,
             m.setupFeeRollOverride === null || m.setupFeeRollOverride === undefined ? '' : m.setupFeeRollOverride,
             m.setupFeeSheetOverride === null || m.setupFeeSheetOverride === undefined ? '' : m.setupFeeSheetOverride,
-            m.defaultPrimer ? 'Да' : 'Нет', m.recommendedMode, getGroupLabel(m.group), m.supplier || ''
+            m.defaultPrimer ? 'Да' : 'Нет', m.recommendedMode, getGroupLabel(m.group), m.supplier || '',
+            m.cutKnife === 'vibro' ? 'вибро' : m.cutKnife === 'drag' ? 'флюгер' : '',
+            m.clientName || ''
         ])
     ];
     const consumablesRows = [CONSUMABLES_SHEET_HEADERS, ...appData.consumables.map(consumableToExcelRow)];
@@ -3698,16 +4854,32 @@ function exportMaterialsExcel() {
         ['powerClimateWorkKw', c.powerClimateWorkKw, 'кВт', 'Климатическое оборудование'],
         ['maxWidthM', c.limits.maxWidthM, 'м', 'Максимальная ширина печати'],
         ['maxThicknessMm', c.limits.maxThicknessMm, 'мм', 'Максимальная толщина материала'],
+        ['mimakiMaxSheetLengthM', c.limits.mimakiMaxSheetLengthM, 'м', 'Mimaki: максимальная длина листа'],
+        ['mimakiSheetMarginMm', c.limits.mimakiSheetMarginMm, 'мм', 'Mimaki, лист: поле от края заготовки'],
+        ['arizonaMaxWidthM', c.limits.arizonaMaxWidthM, 'м', 'Arizona: ширина области печати'],
+        ['arizonaMaxLengthM', c.limits.arizonaMaxLengthM, 'м', 'Arizona: длина области печати'],
+        ...(() => { const pc = printerCostSettings(), d = duplexSettings(); const v = x => x === null || x === undefined ? '' : x; return [
+            ['mimakiCostFactor', v(pc.mimaki.costFactor), '×', 'Mimaki: поправка себестоимости печати'],
+            ['arizonaInkPriceBottleUah', v(pc.arizona.inkPriceBottleUah), 'грн/л', 'Arizona: чернила (пусто = как Mimaki)'],
+            ['arizonaEquipmentCostUah', v(pc.arizona.equipmentCostUah), 'грн', 'Arizona: стоимость принтера (пусто = как Mimaki)'],
+            ['arizonaAmortTotalM2', v(pc.arizona.amortTotalM2), 'м²', 'Arizona: срок амортизации (пусто = как Mimaki)'],
+            ['arizonaPowerPrinterKw', v(pc.arizona.powerPrinterKw), 'кВт', 'Arizona: мощность (пусто = как Mimaki)'],
+            ['arizonaSpeedFactor', v(pc.arizona.speedFactor), '×', 'Arizona: скорость относительно Mimaki'],
+            ['arizonaInkFactor', v(pc.arizona.inkFactor), '×', 'Arizona: расход краски относительно Mimaki'],
+            ['arizonaCostFactor', v(pc.arizona.costFactor), '×', 'Arizona: поправка себестоимости печати'],
+            ['duplexSimpleSetupFactor', d.simpleSetupFactor, '×', 'Двусторонняя простая: приладка 2-й стороны'],
+            ['duplexPreciseSetupFactor', d.preciseSetupFactor, '×', 'Двусторонняя точная: приладка 2-й стороны']
+        ]; })(),
         ['worksDiscWholesale', c.worksTierDiscount.wholesale, '%', 'Доп. работы: скидка для уровня «Опт»'],
         ['worksDiscDealer', c.worksTierDiscount.dealer, '%', 'Доп. работы: скидка для уровня «Дилер»'],
         ['worksCoefMedium', c.worksComplexity.medium, 'коэффициент', 'Доп. работы: средняя сложность'],
         ['worksCoefComplex', c.worksComplexity.complex, 'коэффициент', 'Доп. работы: сложная, мелкие элементы']
     ];
     const printModesRows = [
-        ['Код (не менять для заводских)', 'Название', 'Описание', 'Скорость, м²/ч', 'Расход чернил, мл/м²', 'Кастомный'],
+        ['Код (не менять для заводских)', 'Название', 'Описание', 'Скорость, м²/ч', 'Расход чернил, мл/м²', 'Кастомный', 'Название для клиента (укр.)'],
         ...Object.keys(appData.printModes).map(code => {
             const m = appData.printModes[code];
-            return [code, m.name, m.description || '', m.speedM2h, m.inkMlM2, m.custom ? 'Да' : 'Нет'];
+            return [code, m.name, m.description || '', m.speedM2h, m.inkMlM2, m.custom ? 'Да' : 'Нет', m.clientName || ''];
         })
     ];
     const instructionRows = [
@@ -3792,6 +4964,30 @@ function importPriceSettings(settingsRows) {
     setNumber('powerClimateWorkKw', value => c.powerClimateWorkKw = value);
     setNumber('maxWidthM', value => c.limits.maxWidthM = value, 0.001);
     setNumber('maxThicknessMm', value => c.limits.maxThicknessMm = value, 0.001);
+    setNumber('mimakiMaxSheetLengthM', value => c.limits.mimakiMaxSheetLengthM = value, 0.01);
+    setNumber('mimakiSheetMarginMm', value => c.limits.mimakiSheetMarginMm = value, 0);
+    setNumber('arizonaMaxWidthM', value => c.limits.arizonaMaxWidthM = value, 0.01);
+    setNumber('arizonaMaxLengthM', value => c.limits.arizonaMaxLengthM = value, 0.01);
+    {
+        const pc = printerCostSettings();
+        const setOpt = (code, obj, key, min = 0) => {
+            if (values[code] === undefined) return;
+            const n = optNum(values[code]);
+            obj[key] = n === null || n < min ? null : n;
+        };
+        setOpt('mimakiCostFactor', pc.mimaki, 'costFactor', 0.01);
+        setOpt('arizonaInkPriceBottleUah', pc.arizona, 'inkPriceBottleUah');
+        setOpt('arizonaEquipmentCostUah', pc.arizona, 'equipmentCostUah');
+        setOpt('arizonaAmortTotalM2', pc.arizona, 'amortTotalM2', 0.000001);
+        setOpt('arizonaPowerPrinterKw', pc.arizona, 'powerPrinterKw');
+        setOpt('arizonaSpeedFactor', pc.arizona, 'speedFactor', 0.01);
+        setOpt('arizonaInkFactor', pc.arizona, 'inkFactor');
+        setOpt('arizonaCostFactor', pc.arizona, 'costFactor', 0.01);
+        c.printerCosts = pc;
+        c.duplex = duplexSettings();
+        setNumber('duplexSimpleSetupFactor', value => c.duplex.simpleSetupFactor = value);
+        setNumber('duplexPreciseSetupFactor', value => c.duplex.preciseSetupFactor = value);
+    }
     c.worksTierDiscount = { ...defaultAppData.config.worksTierDiscount, ...(c.worksTierDiscount || {}) };
     c.worksComplexity = { ...defaultAppData.config.worksComplexity, ...(c.worksComplexity || {}) };
     setNumber('worksDiscWholesale', value => c.worksTierDiscount.wholesale = Math.min(100, value));
@@ -3803,19 +4999,19 @@ function importPriceSettings(settingsRows) {
 
 // Листы «Расходники» и «Работы» Excel-прайса. Заголовки — это «контракт» между
 // экспортом, импортом и шаблоном для заполнения: менять их нельзя.
-const CONSUMABLES_SHEET_HEADERS = ['ID (не менять)', 'Вид', 'Название', 'Ширина, мм', 'Толщина, мм', 'Состав / примечание', 'Формат (рулон/лист/шт/комплект)', 'Единица (п.м./шт/м²)', 'Себестоимость за ед.', 'Валюта', 'Наценка, %', 'Подрезка листового, грн/ед', 'Есть в остатках (Да/Нет)', 'Скрыт (Да/Нет)', 'Поставщик'];
-const OPERATIONS_SHEET_HEADERS = ['ID (не менять)', 'Название работы', 'Для групп материалов', 'Единица расчёта', 'Цена за ед., грн', 'Минимум, грн', 'Себестоимость работы за ед., грн', 'Расходник (вид)', 'Расход расходника на ед.', 'Сложность (Да/Нет)', 'Параметр (шаг люверсов, см / кол-во на изделие)', 'Скрыта (Да/Нет)'];
+const CONSUMABLES_SHEET_HEADERS = ['ID (не менять)', 'Вид', 'Название', 'Ширина, мм', 'Толщина, мм', 'Состав / примечание', 'Формат (рулон/лист/шт/комплект)', 'Единица (п.м./шт/м²)', 'Себестоимость за ед.', 'Валюта', 'Наценка, %', 'Подрезка листового, грн/ед', 'Есть в остатках (Да/Нет)', 'Скрыт (Да/Нет)', 'Поставщик', 'Название для клиента (укр.)'];
+const OPERATIONS_SHEET_HEADERS = ['ID (не менять)', 'Название работы', 'Для групп материалов', 'Единица расчёта', 'Цена за ед., грн', 'Минимум, грн', 'Себестоимость работы за ед., грн', 'Расходник (вид)', 'Расход расходника на ед.', 'Сложность (Да/Нет)', 'Параметр (шаг люверсов, см / кол-во на изделие)', 'Скрыта (Да/Нет)', 'Название для клиента (укр.)'];
 
 function consumableToExcelRow(c) {
     return [c.id, c.kind, c.name, c.widthMm ?? '', c.thicknessMm ?? '', c.spec, getConsumableFormatLabel(c.format), getConsumableUnitLabel(c.unit),
-        c.cost, c.currency, c.markupPct, c.prepCostUah, c.inStock ? 'Да' : 'Нет', c.hidden ? 'Да' : 'Нет', c.supplier || ''];
+        c.cost, c.currency, c.markupPct, c.prepCostUah, c.inStock ? 'Да' : 'Нет', c.hidden ? 'Да' : 'Нет', c.supplier || '', c.clientName || ''];
 }
 
 function operationToExcelRow(op) {
     const unit = getWorkUnit(op.unit);
     return [op.id, op.name, unit.scope === 'order' ? '' : groupsToText(op.groups), unit.label, op.price, op.minCharge, op.laborCost,
         op.consumableKind, op.consumableKind ? op.consumablePerUnit : '', op.hasComplexity ? 'Да' : 'Нет',
-        op.unit === 'grommet' || op.unit === 'perItem' ? op.defaultParam : '', op.hidden ? 'Да' : 'Нет'];
+        op.unit === 'grommet' || op.unit === 'perItem' ? op.defaultParam : '', op.hidden ? 'Да' : 'Нет', op.clientName || ''];
 }
 
 // ------------------------------------------------------------------
@@ -3989,7 +5185,8 @@ function importConsumablesRows(rows) {
             prepCostUah: getExcelValue(row, 'Подрезка листового, грн/ед'),
             inStock: parseYesNo(getExcelValue(row, 'Есть в остатках (Да/Нет)', 'Есть в остатках'), true),
             hidden: parseYesNo(getExcelValue(row, 'Скрыт (Да/Нет)', 'Скрыт'), false),
-            supplier: String(getExcelValue(row, 'Поставщик') || '').trim()
+            supplier: String(getExcelValue(row, 'Поставщик') || '').trim(),
+            clientName: String(getExcelValue(row, 'Название для клиента (укр.)', 'Название для клиента') || '').trim()
         }, index));
     });
     return result;
@@ -4014,7 +5211,8 @@ function importOperationsRows(rows) {
             consumablePerUnit: getExcelValue(row, 'Расход расходника на ед.', 'Расход на ед.'),
             hasComplexity: parseYesNo(getExcelValue(row, 'Сложность (Да/Нет)', 'Сложность'), false),
             defaultParam: paramRaw === undefined ? (unit === 'grommet' ? 30 : 1) : paramRaw,
-            hidden: parseYesNo(getExcelValue(row, 'Скрыта (Да/Нет)', 'Скрыта'), false)
+            hidden: parseYesNo(getExcelValue(row, 'Скрыта (Да/Нет)', 'Скрыта'), false),
+            clientName: String(getExcelValue(row, 'Название для клиента (укр.)', 'Название для клиента') || '').trim()
         }, index));
     });
     return result;
@@ -4031,6 +5229,8 @@ function importPrintModes(printModesRows) {
         if (speed === null || ink === null) return;
         const name = String(getExcelValue(row, 'Название') || code).trim();
         const description = String(getExcelValue(row, 'Описание') || '').trim();
+        const clientNameRaw = getExcelValue(row, 'Название для клиента (укр.)', 'Название для клиента');
+        if (appData.printModes[code] && clientNameRaw !== undefined) appData.printModes[code].clientName = String(clientNameRaw || '').trim();
         if (appData.printModes[code]) {
             // Существующий (в т.ч. заводской) режим — обновляем калибруемые поля, не трогая custom/факт заводского эталона.
             appData.printModes[code].speedM2h = speed;
@@ -4100,7 +5300,9 @@ function importMaterialsExcel(event) {
                     defaultPrimer: ['true', 'да', 'yes', '1'].includes(primer),
                     recommendedMode: appData.printModes[modeCode] ? modeCode : 'MODE_CMYK_STD',
                     group: findOrCreateGroupByLabel(getExcelValue(row, 'Группа'), true), // пусто — угадаем по названию
-                    supplier: String(getExcelValue(row, 'Поставщик') || '').trim()
+                    supplier: String(getExcelValue(row, 'Поставщик') || '').trim(),
+                    clientName: String(getExcelValue(row, 'Название для клиента (укр.)', 'Название для клиента') || '').trim(),
+                    cutKnife: (() => { const k = String(getExcelValue(row, 'Нож для порезки насквозь (флюгер/вибро/пусто=авто)', 'Нож для порезки насквозь') || '').trim().toLowerCase(); return k.startsWith('вибро') ? 'vibro' : k.startsWith('флюгер') ? 'drag' : ''; })()
                 };
             }).map(normalizeMaterial);
 
@@ -4159,8 +5361,10 @@ function getOrderFileNamePrefix() {
 }
 
 function printClientEstimate() {
-    const orderTitle = appData.orderName || 'Смета (Без названия)';
-    const dateStr = new Date().toLocaleDateString('ru-RU');
+    // Всё, что видит клиент в PDF, — на украинском.
+    const orderTitle = appData.orderName || 'Кошторис';
+    const dateStr = new Date().toLocaleDateString('uk-UA');
+    const pdfCur = appData.config.baseCurrency === 'UAH' ? 'грн' : appData.config.baseCurrency;
 
     // Примечания к скидкам — внутренние (обоснование для руководителя/бухгалтерии),
     // в PDF для клиента не показываются никогда. А вот сам факт и размер скидки —
@@ -4174,23 +5378,53 @@ function printClientEstimate() {
     }
 
     let html = `<h2>${escapeHtml(orderTitle)}</h2>`;
-    html += `<p style="color:#666; margin-bottom: 20px;">Дата формирования: ${dateStr}</p>`;
+    html += `<p style="color:#666; margin-bottom: 20px;">Дата: ${dateStr}</p>`;
     html += `<table class="print-table">
                 <thead><tr>
                     <th>№</th>
-                    <th>Наименование (Материал)</th>
-                    <th>Размер печати (м)</th>
+                    <th>Найменування</th>
+                    <th>Розмір, м</th>
                     <th>Тираж</th>
-                    <th>Цена за 1 шт</th>
-                    ${showDiscount ? '<th>Скидка</th>' : ''}
-                    <th>Итоговая сумма</th>
+                    <th>Ціна за 1 шт</th>
+                    ${showDiscount ? '<th>Знижка</th>' : ''}
+                    <th>Сума</th>
                 </tr></thead><tbody>`;
 
     let grandTotal = 0;
     let grandTotalBeforeDiscount = 0;
-    appData.positions.forEach((pos, i) => {
+    normalizeLinkOrder();
+    const numbering = computeNumbering();
+    numbering.items.forEach(item => {
+        if (item.type !== 'link') return;
+        // Изделие — одной строкой: название, размер, тираж, цена за штуку, состав.
+        const calcsL = item.positions.filter(isPositionComplete).map(p => ({ p, c: calculatePositionValues(p) }));
+        if (!calcsL.length) { item.pdfRow = ''; return; }
+        const total = calcsL.reduce((s, x) => s + x.c.finalTotal, 0);
+        const before = calcsL.reduce((s, x) => s + x.c.posGrandTotal, 0);
+        grandTotal += total;
+        grandTotalBeforeDiscount += before;
+        const first = item.positions[0];
+        const qty = first.quantity;
+        const disc = before > 0 ? Math.round((1 - total / before) * 1000) / 10 : 0;
+        const sumCell = showDiscount && before > total
+            ? `<span style="text-decoration:line-through; color:#888; font-weight:400;">${before.toFixed(2)}</span> <strong>${total.toFixed(2)} ${pdfCur}</strong>`
+            : `<strong>${total.toFixed(2)} ${pdfCur}</strong>`;
+        item.pdfRow = `<tr>
+                    <td>${item.number}</td>
+                    <td><strong>${escapeHtml(item.name)}</strong><div style="margin-top:6px; font-size:12px; color:#333;">Склад:${calcsL.map(x => `<br>• ${escapeHtml(clientLabel(x.c.mat))} — ${x.c.noPrint ? 'без друку' : `друк: ${escapeHtml(clientLabel(x.c.mode))}${x.c.back ? ', з двох сторін' : ''}`}${x.c.worksLines.length ? `; ${x.c.worksLines.map(l => escapeHtml(clientLabel(l.op))).join(', ')}` : ''}`).join('')}</div></td>
+                    <td>${first.matWidthM.toFixed(2)} x ${first.matHeightM.toFixed(2)}</td>
+                    <td>${qty} шт</td>
+                    <td>${qty > 0 ? (total / qty).toFixed(2) : '—'} ${pdfCur}</td>
+                    ${showDiscount ? `<td>${disc > 0 ? disc + '%' : '—'}</td>` : ''}
+                    <td>${sumCell}</td>
+                 </tr>`;
+    });
+    numbering.items.forEach(item => {
+        if (item.type === 'link') { html += item.pdfRow; return; }
+        const pos = item.positions[0];
+        const i = item.number - 1;
+        if (!isPositionComplete(pos)) return;
         const calc = calculatePositionValues(pos);
-        if (!pos.printWidthM || pos.quantity <= 0) return;
 
         grandTotal += calc.finalTotal;
         grandTotalBeforeDiscount += calc.posGrandTotal;
@@ -4198,15 +5432,15 @@ function printClientEstimate() {
             ? `${pos.matWidthM.toFixed(2)} x ${pos.matHeightM.toFixed(2)}`
             : `${pos.printWidthM.toFixed(2)} x ${pos.printHeightM.toFixed(2)}`;
         const sumCell = showDiscount && calc.discountPercent > 0
-            ? `<span style="text-decoration:line-through; color:#888; font-weight:400;">${calc.posGrandTotal.toFixed(2)}</span> <strong>${calc.finalTotal.toFixed(2)} ${appData.config.baseCurrency}</strong>`
-            : `<strong>${calc.finalTotal.toFixed(2)} ${appData.config.baseCurrency}</strong>`;
+            ? `<span style="text-decoration:line-through; color:#888; font-weight:400;">${calc.posGrandTotal.toFixed(2)}</span> <strong>${calc.finalTotal.toFixed(2)} ${pdfCur}</strong>`
+            : `<strong>${calc.finalTotal.toFixed(2)} ${pdfCur}</strong>`;
 
         html += `<tr>
                     <td>${i + 1}</td>
-                    <td><strong>${escapeHtml(calc.mat.name)}</strong><br><small style="color:#555;">${calc.noPrint ? 'Материал без печати' : `Качество: ${escapeHtml(calc.mode.name.split('(')[0])}`}</small>${calc.worksLines.length ? `<div style="margin-top:6px; font-size:12px; color:#333;">Включено:${calc.worksLines.map(l => `<br>• ${escapeHtml(l.op.name)}${l.cons ? ` (${escapeHtml(formatConsumableName(l.cons))})` : ''} — ${formatQty(l.qty)} ${l.unitShort}: ${l.total.toFixed(2)} ${appData.config.baseCurrency}`).join('')}</div>` : ''}</td>
+                    <td><strong>${pos.templateName ? escapeHtml(pos.templateName) + ' — ' : ''}${escapeHtml(clientLabel(calc.mat))}</strong><br><small style="color:#555;">${calc.noPrint ? 'Матеріал без друку' : `Друк: ${escapeHtml(clientLabel(calc.mode))}${calc.back ? ' · друк з двох сторін' : ''}`}</small>${calc.worksLines.length ? `<div style="margin-top:6px; font-size:12px; color:#333;">Включено:${calc.worksLines.map(l => `<br>• ${escapeHtml(clientLabel(l.op))}${l.cons ? ` (${escapeHtml(clientConsumableName(l.cons))})` : ''} — ${formatQty(l.qty)} ${clientUnit(l.op.unit)}: ${l.total.toFixed(2)} ${pdfCur}`).join('')}</div>` : ''}</td>
                     <td>${sizeStr}</td>
                     <td>${pos.quantity} шт</td>
-                    <td>${calc.finalUnitPrice.toFixed(2)} ${appData.config.baseCurrency}</td>
+                    <td>${calc.finalUnitPrice.toFixed(2)} ${pdfCur}</td>
                     ${showDiscount ? `<td>${calc.discountPercent > 0 ? calc.discountPercent + '%' : '—'}</td>` : ''}
                     <td>${sumCell}</td>
                  </tr>`;
@@ -4219,14 +5453,14 @@ function printClientEstimate() {
         grandTotal += lineFinal;
         grandTotalBeforeDiscount += line.total;
         const sumCell = showDiscount && services.discountPercent > 0
-            ? `<span style="text-decoration:line-through; color:#888; font-weight:400;">${line.total.toFixed(2)}</span> <strong>${lineFinal.toFixed(2)} ${appData.config.baseCurrency}</strong>`
-            : `<strong>${lineFinal.toFixed(2)} ${appData.config.baseCurrency}</strong>`;
+            ? `<span style="text-decoration:line-through; color:#888; font-weight:400;">${line.total.toFixed(2)}</span> <strong>${lineFinal.toFixed(2)} ${pdfCur}</strong>`
+            : `<strong>${lineFinal.toFixed(2)} ${pdfCur}</strong>`;
         html += `<tr>
                     <td>—</td>
-                    <td><strong>${escapeHtml(line.op.name)}</strong><br><small style="color:#555;">Услуга на весь заказ</small></td>
+                    <td><strong>${escapeHtml(clientLabel(line.op))}</strong><br><small style="color:#555;">Послуга на все замовлення</small></td>
                     <td>—</td>
-                    <td>${formatQty(line.qty)} ${line.unitShort}</td>
-                    <td>${line.qty > 0 ? (lineFinal / line.qty).toFixed(2) + ' ' + appData.config.baseCurrency : '—'}</td>
+                    <td>${formatQty(line.qty)} ${clientUnit(line.op.unit)}</td>
+                    <td>${line.qty > 0 ? (lineFinal / line.qty).toFixed(2) + ' ' + pdfCur : '—'}</td>
                     ${showDiscount ? `<td>${services.discountPercent > 0 ? services.discountPercent + '%' : '—'}</td>` : ''}
                     <td>${sumCell}</td>
                  </tr>`;
@@ -4234,10 +5468,10 @@ function printClientEstimate() {
 
     html += `</tbody></table>`;
     if (showDiscount && grandTotalBeforeDiscount > grandTotal) {
-        html += `<div style="text-align:right; color:#555; font-size:14px; margin-top:10px;">Сумма без скидки: ${grandTotalBeforeDiscount.toFixed(2)} ${appData.config.baseCurrency} · Скидка: −${(grandTotalBeforeDiscount - grandTotal).toFixed(2)} ${appData.config.baseCurrency}</div>`;
+        html += `<div style="text-align:right; color:#555; font-size:14px; margin-top:10px;">Сума без знижки: ${grandTotalBeforeDiscount.toFixed(2)} ${pdfCur} · Знижка: −${(grandTotalBeforeDiscount - grandTotal).toFixed(2)} ${pdfCur}</div>`;
     }
-    html += `<div class="print-total">ИТОГО К ОПЛАТЕ: ${grandTotal.toFixed(2)} ${appData.config.baseCurrency}</div>`;
-    html += `<div style="margin-top:40px; font-size:12px; color:#777; text-align:center;">Документ сформирован автоматически</div>`;
+    html += `<div class="print-total">РАЗОМ ДО СПЛАТИ: ${grandTotal.toFixed(2)} ${pdfCur}</div>`;
+    html += `<div style="margin-top:40px; font-size:12px; color:#777; text-align:center;">Документ сформовано автоматично</div>`;
 
     const printDiv = document.getElementById('printClientDiv');
     printDiv.innerHTML = html;
@@ -4249,26 +5483,32 @@ function printClientEstimate() {
 
 function buildExportRows() {
     const rows = [];
+    normalizeLinkOrder();
+    const numbering = computeNumbering();
     appData.positions.forEach((pos, index) => {
+        if (!isPositionComplete(pos)) return;
         const calc = calculatePositionValues(pos);
-        if (!pos.matWidthM || (!pos.noPrint && !pos.printWidthM) || pos.quantity <= 0) return;
 
         rows.push({
-            '№': index + 1,
+            '№': numbering.labels[pos.id],
+            'Изделие': pos.linkId ? (pos.linkName || 'Изделие') : '',
             'Заказ': appData.orderName || '---',
             'Материал': calc.mat.name,
             'Режим печати': calc.noPrint ? 'Без печати (чистый материал)' : calc.mode.name,
+            'Принтер': calc.noPrint ? '' : (calc.printerInfo.selected ? PRINTERS[calc.printerInfo.selected].name + (pos.edgePrint ? ' (в край)' : '') : 'не помещается'),
+            'Двусторонняя': calc.back ? `${calc.duplex === 'precise' ? 'точная' : 'простая'}, 2-я сторона: ${calc.back.mode.name}` : '',
+            'Типовая позиция': pos.templateName || '',
             'Ширина мат-ла, м': pos.matWidthM,
             'Длина мат-ла, м': pos.matHeightM,
             'Ширина печати, м': pos.printWidthM,
             'Длина печати, м': pos.printHeightM,
             'Тираж, шт': pos.quantity,
             'Площадь печати, м²': Number(calc.printAreaM2.toFixed(2)),
-            'Эфф. время работы, ч': Number(calc.effTimeH.toFixed(2)),
+            'Эфф. время работы, ч': Number((calc.effTimeH + calc.backTimeH).toFixed(2)),
             'Тариф печати': pos.priceTier,
             'Коммерч. печать м²': Number(calc.printSellM2.toFixed(2)),
             'Цена материала м²': Number(calc.matSellM2.toFixed(2)),
-            'Приладка': Number(calc.effSetupFee.toFixed(2)),
+            'Приладка': Number((calc.effSetupFee + (calc.back ? calc.back.setupFee : 0)).toFixed(2)),
             'Доп. работы': calc.worksLines.map(l => `${l.op.name}${l.cons ? ` (${formatConsumableName(l.cons)})` : ''}: ${formatQty(l.qty)} ${l.unitShort} = ${l.total.toFixed(2)}`).join('; '),
             'Сумма доп. работ': Number(calc.worksTotal.toFixed(2)),
             'Цена за 1 шт': Number(calc.finalUnitPrice.toFixed(2)),
